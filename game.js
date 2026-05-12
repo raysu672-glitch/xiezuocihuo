@@ -208,10 +208,15 @@ function selectWordAfterFog(word) {
       btn.classList.add('fog-cleared');
       btn.classList.add('selected');
       btn.textContent = word;
+      // 清除迷雾后：点击可取消选择（与正常按钮一致）
       btn.onclick = function() { toggleWord(word, btn); };
     }
   });
   updateAnswerSlots();
+  // 视觉反馈：答案区高亮一下，让学生看到词已进槽
+  const slotsEl = document.getElementById('answerSlots');
+  slotsEl.style.boxShadow = '0 0 18px rgba(63,185,80,0.6)';
+  setTimeout(function(){ slotsEl.style.boxShadow = ''; }, 800);
 }
 
 /* ── Fever Mode ── */
@@ -448,38 +453,56 @@ function handleCorrect() {
 }
 
 /* ── 答错 ── */
+function showWrongEffect(correctAnswer, callback) {
+  const box = document.getElementById('questionBox');
+  box.classList.add('shake');
+  const hint = document.createElement('div');
+  hint.id = 'wrongHint';
+  hint.style.cssText = 'margin-top:16px;font-size:20px;color:#f85149;animation:fadeIn 0.3s;';
+  hint.innerHTML = '✗ 正确答案：<span style="color:#3fb950;font-size:22px;">' + correctAnswer + '</span>';
+  box.appendChild(hint);
+  document.querySelectorAll('.word-btn.selected').forEach(function(btn) {
+    btn.classList.add('wrong-flash');
+  });
+  flashScreen('#f85149');
+  setTimeout(function() {
+    box.classList.remove('shake');
+    const oldHint = document.getElementById('wrongHint');
+    if (oldHint) oldHint.remove();
+    document.querySelectorAll('.word-btn.wrong-flash').forEach(function(b) { b.classList.remove('wrong-flash'); });
+    if (callback) callback();
+  }, 3000);
+}
+
 function handleWrong(correctAnswer) {
   combo = 0;
   totalAnswered++;
-  energy = Math.max(energy - 20, 0);
-  if (feverMode) {
-    energy = Math.max(energy - 30, 0);
-  }
-
-  updateEnergyBar();
+  // 答错不扣能量，让学生有机会重试
   updateStats();
   playWrongSound();
 
   if (feverMode) {
+    // Fever 模式答错：退出 fever，但仍扣少量能量
+    energy = Math.max(energy - 15, 0);
+    updateEnergyBar();
     flashScreen('#f85149');
     exitFeverMode();
-    showWrongEffect(correctAnswer);
-    setTimeout(function() {
+    showWrongEffect(correctAnswer, function() {
       currentIndex++;
       isProcessing = false;
       loadQuestion();
-    }, 1500);
+    });
     return;
   }
 
-  showWrongEffect(correctAnswer);
   shakeScreen();
-
-  setTimeout(function() {
-    currentIndex++;
+  showWrongEffect(correctAnswer, function() {
+    // 清空选择，留在同一题让学生重试
+    selectedWords = [];
+    document.querySelectorAll('.word-btn').forEach(function(b) { b.classList.remove('selected'); });
+    updateAnswerSlots();
     isProcessing = false;
-    loadQuestion();
-  }, 1800);
+  });
 }
 
 /* ── 特效 ── */
@@ -509,26 +532,6 @@ function showFeverCorrectEffect() {
 
   document.getElementById('centerPanel').classList.add('fever-shake');
   setTimeout(function() { document.getElementById('centerPanel').classList.remove('fever-shake'); }, 500);
-}
-
-function showWrongEffect(correctAnswer) {
-  const box = document.getElementById('questionBox');
-  box.classList.add('shake');
-  const hint = document.createElement('div');
-  hint.id = 'wrongHint';
-  hint.style.cssText = 'margin-top:16px;font-size:18px;color:#f85149;animation:fadeIn 0.3s;';
-  hint.innerHTML = '✗ 正确答案：<span style="color:#3fb950">' + correctAnswer + '</span>';
-  box.appendChild(hint);
-  document.querySelectorAll('.word-btn.selected').forEach(function(btn) {
-    btn.classList.add('wrong-flash');
-  });
-  flashScreen('#f85149');
-  setTimeout(function() {
-    box.classList.remove('shake');
-    const oldHint = document.getElementById('wrongHint');
-    if (oldHint) oldHint.remove();
-    document.querySelectorAll('.word-btn.wrong-flash').forEach(function(b) { b.classList.remove('wrong-flash'); });
-  }, 1800);
 }
 
 function spawnParticles() {

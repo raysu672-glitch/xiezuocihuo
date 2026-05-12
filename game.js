@@ -171,7 +171,10 @@ function showFogModal(word) {
   const result = document.getElementById('fogResult');
   input.focus();
 
+  let fogCloseCalled = false;
   function close(success) {
+    if (fogCloseCalled) return;   // 防止重复调用
+    fogCloseCalled = true;
     overlay.remove();
     if (success) {
       clearedFogWords.add(word);
@@ -180,6 +183,7 @@ function showFogModal(word) {
   }
 
   document.getElementById('fogConfirmBtn').onclick = function() {
+    if (fogCloseCalled) return;
     if (input.value.trim().toLowerCase() === word.toLowerCase()) {
       result.className = 'fog-result success';
       result.textContent = '✓ 正确！';
@@ -209,13 +213,21 @@ function selectWordAfterFog(word) {
       btn.classList.add('fog-cleared');
       btn.classList.add('selected');
       btn.textContent = word;
-      // 清除迷雾后：点击可取消选择（与正常按钮一致）
       btn.onclick = function() { toggleWord(word, btn); };
     }
   });
   updateAnswerSlots();
-  // 视觉反馈：答案区高亮一下，让学生看到词已进槽
+
+  // Fever 模式下答案槽被 CSS 隐藏，强制短暂显示让学生看到词已进槽
   const slotsEl = document.getElementById('answerSlots');
+  if (feverMode) {
+    slotsEl.style.setProperty('display', 'flex', 'important');
+    setTimeout(function() {
+      slotsEl.style.removeProperty('display');
+    }, 1200);
+  }
+
+  // 视觉反馈：答案区高亮，让学生看到词已进槽
   slotsEl.style.boxShadow = '0 0 18px rgba(63,185,80,0.6)';
   setTimeout(function(){ slotsEl.style.boxShadow = ''; }, 800);
 }

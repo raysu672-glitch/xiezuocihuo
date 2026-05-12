@@ -35,6 +35,7 @@ let feverTimer = null;
 let feverTimeLeft = 0;
 let audioCtx = null;
 let clearedFogWords = new Set();
+let questionFailed = false;
 
 function init() {
   createBgParticles();
@@ -283,6 +284,7 @@ function loadQuestion() {
   document.getElementById('feverProgress').textContent = '';
 
   clearedFogWords = new Set();
+  questionFailed = false;  // 加载新题时重置失败标记
   selectedWords = [];
   buildWordPool(q);
   updateAnswerSlots();
@@ -420,12 +422,17 @@ function handleCorrect() {
   totalAnswered++;
   if (combo > maxCombo) maxCombo = combo;
 
-  const gain = Math.min(20 + (combo - 1) * 5, 35);
-  energy = Math.min(energy + gain, 100);
+  if (!questionFailed) {
+    // 本题未答错过，正常加能量
+    const gain = Math.min(20 + (combo - 1) * 5, 35);
+    energy = Math.min(energy + gain, 100);
+  }
+  // 曾答错：能量不变，combo 仍累计但不加能量
 
   updateEnergyBar();
   updateStats();
   playCorrectSound();
+  questionFailed = false;  // 重置，进入下一题
 
   if (feverMode) {
     showFeverCorrectEffect();
@@ -477,13 +484,16 @@ function showWrongEffect(correctAnswer, callback) {
 function handleWrong(correctAnswer) {
   combo = 0;
   totalAnswered++;
-  // 答错不扣能量，让学生有机会重试
+  // 答错扣能量
+  energy = Math.max(energy - 20, 0);
+  questionFailed = true;  // 标记本题曾答错，重试答对也不加能量
+  updateEnergyBar();
   updateStats();
   playWrongSound();
 
   if (feverMode) {
-    // Fever 模式答错：退出 fever，但仍扣少量能量
-    energy = Math.max(energy - 15, 0);
+    // Fever 模式答错：额外再扣 30 能量，并退出 fever
+    energy = Math.max(energy - 30, 0);
     updateEnergyBar();
     flashScreen('#f85149');
     exitFeverMode();

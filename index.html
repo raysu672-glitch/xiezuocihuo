@@ -690,9 +690,62 @@
     z-index: 0;
   }
   body.fever .bg-particle { background: rgba(255,215,0,0.3); }
+
+  /* 学习页面 */
+  #studyOverlay {
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: #0a0e17;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    z-index: 500; padding: 30px 20px; box-sizing: border-box; overflow-y: auto;
+  }
+  .study-header { text-align: center; margin-bottom: 16px; padding-top: 10px; }
+  .study-header h2 { color: #58a6ff; font-size: 22px; margin-bottom: 6px; }
+  .study-header p { color: #8b949e; font-size: 13px; }
+  #studyTimer {
+    font-size: 48px; font-weight: 900; color: #ffd700;
+    margin-bottom: 12px; font-family: 'Courier New', monospace;
+    text-shadow: 0 0 20px rgba(255,215,0,0.5);
+  }
+  #studySkipBtn {
+    padding: 10px 36px; border-radius: 10px; border: 1px solid #30363d;
+    background: #21262d; color: #8b949e; font-size: 15px; cursor: pointer;
+    transition: all 0.2s; margin-bottom: 24px;
+  }
+  #studySkipBtn:hover { background: #30363d; color: #e0e0e0; }
+  #studyGrid {
+    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    max-width: 950px;
+  }
+  .study-card {
+    background: #161b22; border: 1px solid #21262d; border-radius: 12px;
+    padding: 14px 18px; width: 280px;
+    transition: all 0.2s;
+  }
+  .study-card:hover { border-color: #58a6ff; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(88,166,255,0.15); }
+  .study-card-zh { font-size: 15px; color: #f0f6fc; margin-bottom: 6px; font-weight: 600; }
+  .study-card-en { font-size: 14px; color: #8b949e; font-family: 'Segoe UI', sans-serif; }
+  .study-timer-warning { color: #f85149 !important; animation: studyTimerPulse 0.5s infinite alternate; }
+  @keyframes studyTimerPulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.08); }
+  }
 </style>
 </head>
 <body>
+
+<!-- 学习页面 -->
+<div id="studyOverlay">
+  <div class="study-header">
+    <h2>📖 课前学习 — 基础必背20词伙</h2>
+    <p>建议先学习 5 分钟，或点击「跳过」直接进入练习</p>
+  </div>
+  <div id="studyTimer">05:00</div>
+  <button id="studySkipBtn">跳过 → 直接练习</button>
+  <div id="studyGrid"></div>
+</div>
+
+<!-- 游戏内容（默认隐藏） -->
+<div id="gameContent" style="display:none;">
 
 <div class="header">
   <h1>词伙练习</h1>
@@ -738,6 +791,7 @@
     <div class="combo-label">连击</div>
     <div class="combo-value" id="comboValue">x0</div>
   </div>
+</div>
 </div>
 
 <script>

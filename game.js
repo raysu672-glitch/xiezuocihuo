@@ -37,7 +37,53 @@ let audioCtx = null;
 let clearedFogWords = new Set();
 let questionFailed = false;
 
+let studyTimer = null;
+let studyTimeLeft = 300;
+
 function init() {
+  populateStudyPage();
+  startStudyTimer();
+}
+
+function populateStudyPage() {
+  var grid = document.getElementById('studyGrid');
+  grid.innerHTML = '';
+  vocab.forEach(function(item) {
+    var card = document.createElement('div');
+    card.className = 'study-card';
+    card.innerHTML = '<div class="study-card-zh">' + item.zh + '</div>' +
+                     '<div class="study-card-en">' + item.en + '</div>';
+    grid.appendChild(card);
+  });
+}
+
+function startStudyTimer() {
+  studyTimeLeft = 300;
+  updateStudyTimerDisplay();
+  document.getElementById('studySkipBtn').onclick = endStudy;
+  studyTimer = setInterval(function() {
+    studyTimeLeft--;
+    updateStudyTimerDisplay();
+    if (studyTimeLeft <= 0) {
+      clearInterval(studyTimer);
+      endStudy();
+    }
+  }, 1000);
+}
+
+function updateStudyTimerDisplay() {
+  var min = Math.floor(studyTimeLeft / 60);
+  var sec = studyTimeLeft % 60;
+  var timerEl = document.getElementById('studyTimer');
+  timerEl.textContent =
+    (min < 10 ? '0' + min : min) + ':' + (sec < 10 ? '0' + sec : sec);
+  timerEl.classList.toggle('study-timer-warning', studyTimeLeft <= 30);
+}
+
+function endStudy() {
+  clearInterval(studyTimer);
+  document.getElementById('studyOverlay').style.display = 'none';
+  document.getElementById('gameContent').style.display = '';
   createBgParticles();
   shuffleVocab();
   loadQuestion();

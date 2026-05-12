@@ -229,7 +229,7 @@ function enterFeverMode() {
   document.getElementById('questionHint').textContent = '⚡ FEVER MODE — 直接打字输入！';
   document.getElementById('questionHint').style.color = '#ffd700';
 
-  feverTimeLeft = 12;
+  feverTimeLeft = 23;
   updateFeverTimer();
   feverTimer = setInterval(function() {
     feverTimeLeft--;

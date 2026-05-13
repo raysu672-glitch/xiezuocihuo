@@ -21,60 +21,99 @@ const vocab = [
   { zh: "令人信服的理由", en: "compelling reasons" }
 ];
 
-/* ── 语义连线任务数据 ──
-   每条任务：
-   - afterCount: 完成第几题后触发（基于 totalCorrect）
-   - plain: 平庸原句
-   - phrases: 要依次填入的词伙（按句中出现顺序）
-   - template: 升级句模板，{0}{1}... 对应 phrases 的占位
-   - templateParts: 模板分段（空白之间的静态文字），用于渲染
+/* ── 语义连线任务 ──
+   动态方案：追踪最近练过的词伙，每完成3题触发一次，
+   对每个词伙从中文含义出发各生成一句改写。
 */
-const synthesisGroups = [
-  {
-    afterCount: 3,
-    plain: '"Many problems are caused by this."',
-    phrases: ['a barrage of problems', 'primary cause'],
-    template: '{0} find their {1} in this very issue.',
-    templateParts: ['', ' find their ', ' in this very issue.']
+const synthesisTemplates = {
+  // key: 词伙英文原文（完全匹配）
+  // plain: 平庸原句（雅思风格，学生先看到）
+  // upgraded: 升级后句子（{phrase} 替换为词伙）
+  'a barrage of problems': {
+    plain: '"There are many problems in this area."',
+    upgraded: 'A barrage of problems has emerged in this area.'
   },
-  {
-    afterCount: 6,
-    plain: '"This has become something people pay attention to."',
-    phrases: ['a matter of heightened concern', 'a focus of attention'],
-    template: 'This has become {0} and {1} for researchers worldwide.',
-    templateParts: ['This has become ', ' and ', ' for researchers worldwide.']
+  'a contributing factor': {
+    plain: '"This is one reason for the issue."',
+    upgraded: 'This serves as a contributing factor to the broader issue.'
   },
-  {
-    afterCount: 9,
-    plain: '"There is a lot of evidence that this approach is better."',
-    phrases: ['a growing body of evidence', 'a more feasible approach'],
-    template: 'There is {0} suggesting that this represents {1}.',
-    templateParts: ['There is ', ' suggesting that this represents ', '.']
+  'a focus of attention': {
+    plain: '"Many people are concerned about this."',
+    upgraded: 'This has become a focus of attention for policymakers.'
   },
-  {
-    afterCount: 12,
-    plain: '"This is part of solving the problem."',
-    phrases: ['a vital component', 'the crux of a problem'],
-    template: 'Addressing this is {0} of resolving {1}.',
-    templateParts: ['Addressing this is ', ' of resolving ', '.']
+  'a growing body of evidence': {
+    plain: '"More and more studies show this is true."',
+    upgraded: 'A growing body of evidence suggests this phenomenon is widespread.'
   },
-  {
-    afterCount: 15,
-    plain: '"The crisis is here and there are many choices to deal with it."',
-    phrases: ['the looming crisis', 'a wide range of options'],
-    template: 'Tackling {0} demands {1} from policymakers.',
-    templateParts: ['Tackling ', ' demands ', ' from policymakers.']
+  'a matter of heightened concern': {
+    plain: '"People are paying more attention to this issue."',
+    upgraded: 'This has become a matter of heightened concern in modern society.'
   },
-  {
-    afterCount: 18,
-    plain: '"There is a lot of evidence and many reasons to act now."',
-    phrases: ['compelling evidence', 'compelling reasons'],
-    template: 'We now have {0} and {1} to take immediate action.',
-    templateParts: ['We now have ', ' and ', ' to take immediate action.']
+  'a more feasible approach': {
+    plain: '"This way of solving the problem is better and easier."',
+    upgraded: 'Policymakers should adopt a more feasible approach to address it.'
+  },
+  'a sense of fulfillment': {
+    plain: '"People feel happy when they achieve something."',
+    upgraded: 'Volunteer work can provide a sense of fulfillment for participants.'
+  },
+  'a very shortsighted view': {
+    plain: '"Only thinking about immediate benefits is not good."',
+    upgraded: 'This represents a very shortsighted view of long-term development.'
+  },
+  'a vital component': {
+    plain: '"Education is important for solving this problem."',
+    upgraded: 'Education is a vital component of any effective solution.'
+  },
+  'a wealth of information': {
+    plain: '"The internet gives people lots of data."',
+    upgraded: 'The internet provides a wealth of information at our fingertips.'
+  },
+  'a well-known fact': {
+    plain: '"Everyone knows that smoking is harmful."',
+    upgraded: 'It is a well-known fact that smoking causes serious health issues.'
+  },
+  'a wide range of options': {
+    plain: '"There are many different choices available."',
+    upgraded: 'Consumers now have a wide range of options in the marketplace.'
+  },
+  'ample evidence': {
+    plain: '"There is a lot of proof for this claim."',
+    upgraded: 'There is ample evidence that early intervention is highly effective.'
+  },
+  'primary cause': {
+    plain: '"The main reason for this is economic factors."',
+    upgraded: 'Unemployment remains the primary cause of social unrest in the region.'
+  },
+  'the crux of a problem': {
+    plain: '"The key to solving this is better communication."',
+    upgraded: 'The crux of a problem often lies in miscommunication between groups.'
+  },
+  'the looming crisis': {
+    plain: '"There may be a big problem coming in the future."',
+    upgraded: 'Climate change represents the looming crisis of our generation.'
+  },
+  'the major barrier': {
+    plain: '"The biggest difficulty is lack of money."',
+    upgraded: 'Funding shortages remain the major barrier to innovation.'
+  },
+  'a sense of self-fulfillment': {
+    plain: '"People feel satisfied when they reach their goals."',
+    upgraded: 'Career advancement often brings a sense of self-fulfillment.'
+  },
+  'compelling evidence': {
+    plain: '"There are strong proofs that this method works."',
+    upgraded: 'There is compelling evidence that regular exercise improves mental health.'
+  },
+  'compelling reasons': {
+    plain: '"There are good arguments for doing this."',
+    upgraded: 'There are compelling reasons to invest in renewable energy now.'
   }
-];
+};
 
-let synthesisDone = new Set(); // 已触发过的 afterCount 值，防止重复弹出
+let recentPhrases = []; // 最近练过的词伙（最多3个），用于触发语义连线
+let synthesisFired = false; // 本轮（每3题）是否已触发过一次
+
 
 
 let currentIndex = 0;
@@ -569,14 +608,18 @@ function handleCorrect() {
     if (!feverMode && (energy >= 100 || combo >= 5)) {
       enterFeverMode();
     }
-    // 检测语义连线任务触发
-    var synGroup = synthesisGroups.find(function(g) {
-      return g.afterCount === totalCorrect && !synthesisDone.has(g.afterCount);
-    });
-    if (synGroup) {
-      synthesisDone.add(synGroup.afterCount);
-      showSynthesisModal(synGroup);
-      return; // loadQuestion 交给 showSynthesisModal 关闭后调用
+    // 语义连线：追踪最近正确完成的词伙，每3题触发一次
+    var q = vocab[currentIndex - 1]; // 当前题（刚答对的那题）
+    if (q) {
+      recentPhrases.push({ zh: q.zh, en: q.en });
+      if (recentPhrases.length > 3) recentPhrases.shift();
+    }
+    if (recentPhrases.length === 3 && !synthesisFired) {
+      synthesisFired = true;
+      var phrasesToShow = recentPhrases.slice(); // 触发时保存当前3个词伙
+      recentPhrases = []; // 清空队列，防止弹窗关闭后立即再次触发
+      showSynthesisModal(phrasesToShow);
+      return; // loadQuestion 交给弹窗关闭后调用
     }
     loadQuestion();
   }, delay);
@@ -873,98 +916,80 @@ document.getElementById('feverInput').addEventListener('input', function() {
 });
 
 /* ── 语义连线弹窗 ── */
-function showSynthesisModal(group) {
+function showSynthesisModal(phrases) {
   var overlay = document.createElement('div');
   overlay.className = 'synthesis-overlay';
 
-  // 构建模板 HTML（用下划线占位）
-  var templateHtml = '';
-  group.templateParts.forEach(function(part, i) {
-    templateHtml += (part ? '<span class="syn-static">' + part + '</span>' : '');
-    if (i < group.phrases.length) {
-      templateHtml += '<span class="syn-blank" id="synBlank' + i + '"></span>';
-    }
-  });
-
-  // 构建词伙按钮
-  var phraseButtonsHtml = '';
-  group.phrases.forEach(function(phrase, i) {
-    phraseButtonsHtml += '<button class="synthesis-phrase-btn" id="synPhraseBtn' + i + '" data-idx="' + i + '">' + phrase + '</button>';
+  // 构建3个独立卡片
+  var cardsHtml = '';
+  phrases.forEach(function(phrase, i) {
+    var tpl = synthesisTemplates[phrase.en] || {
+      plain: 'This is an important issue.',
+      upgraded: phrase.en + ' is a critical factor in this context.'
+    };
+    cardsHtml +=
+      '<div class="syn-card" id="synCard' + i + '">' +
+        '<div class="syn-card-phrase">' + phrase.zh + ' <span class="syn-en">(' + phrase.en + ')</span></div>' +
+        '<div class="syn-card-plain">' +
+          '<span class="syn-label syn-label-bad">原句</span>' +
+          '<span class="syn-plain-text">' + tpl.plain + '</span>' +
+        '</div>' +
+        '<div class="syn-card-reveal" id="synReveal' + i + '">' +
+          '<button class="syn-reveal-btn" id="synRevealBtn' + i + '">揭晓答案 ✨</button>' +
+        '</div>' +
+        '<div class="syn-card-upgraded" id="synUpgraded' + i + '" style="display:none">' +
+          '<span class="syn-label syn-label-good">升级版</span>' +
+          '<span class="syn-upgraded-text">' + tpl.upgraded + '</span>' +
+        '</div>' +
+      '</div>';
   });
 
   overlay.innerHTML =
-    '<div class="synthesis-modal">' +
-      '<div class="synthesis-badge">✏️ CONTEXTUAL SYNTHESIS</div>' +
-      '<div class="synthesis-title">将平庸的句子升级为学术表达</div>' +
-      '<div class="synthesis-plain-sentence">' +
-        '<span class="plain-label">原句（平庸版）</span>' +
-        group.plain +
-      '</div>' +
-      '<div class="synthesis-instruction">按顺序点击词伙，填入下方句子的空白处 ↓</div>' +
-      '<div class="synthesis-phrase-btns" id="synPhraseBtns">' + phraseButtonsHtml + '</div>' +
-      '<div class="synthesis-target-area" id="synTargetArea">' + templateHtml + '</div>' +
-      '<div class="synthesis-result-msg" id="synResultMsg"></div>' +
-      '<button class="synthesis-skip-btn" id="synSkipBtn">跳过此任务</button>' +
+    '<div class="synthesis-modal" style="max-width:700px;">' +
+      '<div class="synthesis-badge">✏️ CONTEXTUAL SYNTHESIS · 语义连线</div>' +
+      '<div class="synthesis-title">检测理解深度 — 用刚学过的词伙升级以下句子</div>' +
+      '<div class="syn-cards-container" id="synCardsContainer">' + cardsHtml + '</div>' +
+      '<div class="syn-progress" id="synProgress">已揭晓 0 / 3</div>' +
+      '<div class="syn-result-msg" id="synResultMsg"></div>' +
+      '<button class="synthesis-skip-btn" id="synSkipBtn">跳过，继续练习</button>' +
     '</div>';
 
   document.body.appendChild(overlay);
 
-  var nextExpected = 0; // 下一个应该点击的词伙索引
+  var revealed = 0;
 
-  function onPhraseClick(idx) {
-    var btn = document.getElementById('synPhraseBtn' + idx);
-    if (!btn || btn.classList.contains('used')) return;
-
-    if (idx === nextExpected) {
-      // 正确顺序
-      btn.classList.add('used');
-      var blank = document.getElementById('synBlank' + idx);
-      if (blank) {
-        blank.textContent = group.phrases[idx];
-        blank.classList.add('filled');
-      }
-      nextExpected++;
-
-      // 播放按键音
+  phrases.forEach(function(phrase, i) {
+    var btn = document.getElementById('synRevealBtn' + i);
+    if (!btn) return;
+    btn.onclick = function() {
+      var revealDiv = document.getElementById('synReveal' + i);
+      var upgradedDiv = document.getElementById('synUpgraded' + i);
+      revealDiv.style.display = 'none';
+      upgradedDiv.style.display = 'block';
+      revealed++;
+      document.getElementById('synProgress').textContent = '已揭晓 ' + revealed + ' / ' + phrases.length;
       playCorrectTick();
 
-      if (nextExpected === group.phrases.length) {
-        // 全部填完！
-        document.getElementById('synTargetArea').classList.add('completed');
-        document.getElementById('synResultMsg').className = 'synthesis-result-msg success';
-        document.getElementById('synResultMsg').textContent = '🎉 完美！平庸句已升级为学术表达！';
+      if (revealed === phrases.length) {
+        document.getElementById('synResultMsg').className = 'syn-result-msg success';
+        document.getElementById('synResultMsg').textContent = '🎉 完美！词伙已深度掌握！';
         document.getElementById('synSkipBtn').textContent = '继续练习 →';
         spawnParticles();
         playCorrectSound();
-        // 3秒后自动关闭
-        setTimeout(closeModal, 2800);
+        setTimeout(closeModal, 2000);
       }
-    } else {
-      // 顺序错误
-      btn.classList.add('wrong-pick');
-      document.getElementById('synResultMsg').className = 'synthesis-result-msg hint';
-      document.getElementById('synResultMsg').textContent = '⚠️ 请按句中出现的顺序点击！';
-      playWrongSound();
-      setTimeout(function() {
-        btn.classList.remove('wrong-pick');
-        document.getElementById('synResultMsg').textContent = '';
-      }, 800);
-    }
-  }
-
-  // 绑定按钮事件
-  group.phrases.forEach(function(_, i) {
-    var btn = document.getElementById('synPhraseBtn' + i);
-    if (btn) btn.onclick = function() { onPhraseClick(i); };
+    };
   });
 
   function closeModal() {
+    synthesisFired = false;
     overlay.remove();
     loadQuestion();
   }
 
   document.getElementById('synSkipBtn').onclick = closeModal;
 }
+
 
 function playCorrectTick() {
   if (!audioCtx) return;

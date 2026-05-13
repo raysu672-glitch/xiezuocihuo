@@ -21,7 +21,62 @@ const vocab = [
   { zh: "令人信服的理由", en: "compelling reasons" }
 ];
 
-let currentIndex = 0;
+/* ── 语义连线任务数据 ──
+   每条任务：
+   - afterCount: 完成第几题后触发（基于 totalCorrect）
+   - plain: 平庸原句
+   - phrases: 要依次填入的词伙（按句中出现顺序）
+   - template: 升级句模板，{0}{1}... 对应 phrases 的占位
+   - templateParts: 模板分段（空白之间的静态文字），用于渲染
+*/
+const synthesisGroups = [
+  {
+    afterCount: 3,
+    plain: '"Many problems are caused by this."',
+    phrases: ['a barrage of problems', 'primary cause'],
+    template: '{0} find their {1} in this very issue.',
+    templateParts: ['', ' find their ', ' in this very issue.']
+  },
+  {
+    afterCount: 6,
+    plain: '"This has become something people pay attention to."',
+    phrases: ['a matter of heightened concern', 'a focus of attention'],
+    template: 'This has become {0} and {1} for researchers worldwide.',
+    templateParts: ['This has become ', ' and ', ' for researchers worldwide.']
+  },
+  {
+    afterCount: 9,
+    plain: '"There is a lot of evidence that this approach is better."',
+    phrases: ['a growing body of evidence', 'a more feasible approach'],
+    template: 'There is {0} suggesting that this represents {1}.',
+    templateParts: ['There is ', ' suggesting that this represents ', '.']
+  },
+  {
+    afterCount: 12,
+    plain: '"This is part of solving the problem."',
+    phrases: ['a vital component', 'the crux of a problem'],
+    template: 'Addressing this is {0} of resolving {1}.',
+    templateParts: ['Addressing this is ', ' of resolving ', '.']
+  },
+  {
+    afterCount: 15,
+    plain: '"The crisis is here and there are many choices to deal with it."',
+    phrases: ['the looming crisis', 'a wide range of options'],
+    template: 'Tackling {0} demands {1} from policymakers.',
+    templateParts: ['Tackling ', ' demands ', ' from policymakers.']
+  },
+  {
+    afterCount: 18,
+    plain: '"There is a lot of evidence and many reasons to act now."',
+    phrases: ['compelling evidence', 'compelling reasons'],
+    template: 'We now have {0} and {1} to take immediate action.',
+    templateParts: ['We now have ', ' and ', ' to take immediate action.']
+  }
+];
+
+let synthesisDone = new Set(); // 已触发过的 afterCount 值，防止重复弹出
+
+
 let energy = 0;
 let combo = 0;
 let maxCombo = 0;
@@ -513,6 +568,15 @@ function handleCorrect() {
     if (!feverMode && (energy >= 100 || combo >= 5)) {
       enterFeverMode();
     }
+    // 检测语义连线任务触发
+    var synGroup = synthesisGroups.find(function(g) {
+      return g.afterCount === totalCorrect && !synthesisDone.has(g.afterCount);
+    });
+    if (synGroup) {
+      synthesisDone.add(synGroup.afterCount);
+      showSynthesisModal(synGroup);
+      return; // loadQuestion 交给 showSynthesisModal 关闭后调用
+    }
     loadQuestion();
   }, delay);
 }
@@ -806,5 +870,116 @@ document.getElementById('feverInput').addEventListener('input', function() {
     this.style.borderColor = 'rgba(248,81,73,0.6)';
   }
 });
+
+/* ── 语义连线弹窗 ── */
+function showSynthesisModal(group) {
+  var overlay = document.createElement('div');
+  overlay.className = 'synthesis-overlay';
+
+  // 构建模板 HTML（用下划线占位）
+  var templateHtml = '';
+  group.templateParts.forEach(function(part, i) {
+    templateHtml += (part ? '<span class="syn-static">' + part + '</span>' : '');
+    if (i < group.phrases.length) {
+      templateHtml += '<span class="syn-blank" id="synBlank' + i + '"></span>';
+    }
+  });
+
+  // 构建词伙按钮
+  var phraseButtonsHtml = '';
+  group.phrases.forEach(function(phrase, i) {
+    phraseButtonsHtml += '<button class="synthesis-phrase-btn" id="synPhraseBtn' + i + '" data-idx="' + i + '">' + phrase + '</button>';
+  });
+
+  overlay.innerHTML =
+    '<div class="synthesis-modal">' +
+      '<div class="synthesis-badge">✏️ CONTEXTUAL SYNTHESIS</div>' +
+      '<div class="synthesis-title">将平庸的句子升级为学术表达</div>' +
+      '<div class="synthesis-plain-sentence">' +
+        '<span class="plain-label">原句（平庸版）</span>' +
+        group.plain +
+      '</div>' +
+      '<div class="synthesis-instruction">按顺序点击词伙，填入下方句子的空白处 ↓</div>' +
+      '<div class="synthesis-phrase-btns" id="synPhraseBtns">' + phraseButtonsHtml + '</div>' +
+      '<div class="synthesis-target-area" id="synTargetArea">' + templateHtml + '</div>' +
+      '<div class="synthesis-result-msg" id="synResultMsg"></div>' +
+      '<button class="synthesis-skip-btn" id="synSkipBtn">跳过此任务</button>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  var nextExpected = 0; // 下一个应该点击的词伙索引
+
+  function onPhraseClick(idx) {
+    var btn = document.getElementById('synPhraseBtn' + idx);
+    if (!btn || btn.classList.contains('used')) return;
+
+    if (idx === nextExpected) {
+      // 正确顺序
+      btn.classList.add('used');
+      var blank = document.getElementById('synBlank' + idx);
+      if (blank) {
+        blank.textContent = group.phrases[idx];
+        blank.classList.add('filled');
+      }
+      nextExpected++;
+
+      // 播放按键音
+      playCorrectTick();
+
+      if (nextExpected === group.phrases.length) {
+        // 全部填完！
+        document.getElementById('synTargetArea').classList.add('completed');
+        document.getElementById('synResultMsg').className = 'synthesis-result-msg success';
+        document.getElementById('synResultMsg').textContent = '🎉 完美！平庸句已升级为学术表达！';
+        document.getElementById('synSkipBtn').textContent = '继续练习 →';
+        spawnParticles();
+        playCorrectSound();
+        // 3秒后自动关闭
+        setTimeout(closeModal, 2800);
+      }
+    } else {
+      // 顺序错误
+      btn.classList.add('wrong-pick');
+      document.getElementById('synResultMsg').className = 'synthesis-result-msg hint';
+      document.getElementById('synResultMsg').textContent = '⚠️ 请按句中出现的顺序点击！';
+      playWrongSound();
+      setTimeout(function() {
+        btn.classList.remove('wrong-pick');
+        document.getElementById('synResultMsg').textContent = '';
+      }, 800);
+    }
+  }
+
+  // 绑定按钮事件
+  group.phrases.forEach(function(_, i) {
+    var btn = document.getElementById('synPhraseBtn' + i);
+    if (btn) btn.onclick = function() { onPhraseClick(i); };
+  });
+
+  function closeModal() {
+    overlay.remove();
+    loadQuestion();
+  }
+
+  document.getElementById('synSkipBtn').onclick = closeModal;
+}
+
+function playCorrectTick() {
+  if (!audioCtx) return;
+  try {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1100, audioCtx.currentTime + 0.06);
+    gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.12);
+  } catch(e) {}
+}
 
 init();

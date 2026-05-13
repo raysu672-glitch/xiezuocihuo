@@ -131,48 +131,157 @@ let questionFailed = false;
 let studyTimer = null;
 let studyTimeLeft = 300;
 
+/* ── 学习页面（逐个输入两遍）─────────────
+   每个词伙：先显示英文参考 → 学生输入第一遍 → 显示结果
+          → 再输入第二遍 → 标记完成 → 下一个词伙
+   可随时跳过，跳过后该词伙变灰
+──────────────────────────────────────── */
+let studyIndex = 0;
+let studyRound = 1;   // 1 = 第一遍，2 = 第二遍
+let studySkipped = new Set();  // 跳过的词伙索引
+
 function init() {
   populateStudyPage();
-  startStudyTimer();
+  showStudyCard(studyIndex);
 }
 
 function populateStudyPage() {
   var grid = document.getElementById('studyGrid');
   grid.innerHTML = '';
-  vocab.forEach(function(item) {
+  vocab.forEach(function(item, idx) {
     var card = document.createElement('div');
     card.className = 'study-card';
+    card.id = 'studyCard_' + idx;
     card.innerHTML = '<div class="study-card-zh">' + item.zh + '</div>' +
                      '<div class="study-card-en">' + item.en + '</div>';
+    card.onclick = function() {
+      jumpToStudyItem(idx);
+    };
     grid.appendChild(card);
   });
 }
 
-function startStudyTimer() {
-  studyTimeLeft = 300;
-  updateStudyTimerDisplay();
-  document.getElementById('studySkipBtn').onclick = endStudy;
-  studyTimer = setInterval(function() {
-    studyTimeLeft--;
-    updateStudyTimerDisplay();
-    if (studyTimeLeft <= 0) {
-      clearInterval(studyTimer);
-      endStudy();
+/* 跳转/聚焦到某个词伙开始学习 */
+function jumpToStudyItem(idx) {
+  studyIndex = idx;
+  studyRound = 1;
+  studySkipped.delete(idx);
+  showStudyCard(idx);
+}
+
+/* 显示当前学习卡片 */
+function showStudyCard(idx) {
+  if (idx >= vocab.length) {
+    finishStudy();
+    return;
+  }
+
+  var item = vocab[idx];
+  var progress = (studyIndex + 1) + ' / ' + vocab.length;
+  document.getElementById('studyProgress').textContent = progress;
+
+  var card = document.getElementById('studyCard');
+  card.classList.add('active');
+
+  document.getElementById('studyLearnZh').textContent = item.zh;
+  document.getElementById('studyLearnEnRef').textContent = item.en;
+
+  var roundLabel = document.getElementById('studyRoundLabel');
+  roundLabel.textContent = '第 ' + studyRound + ' 遍（共需2遍）';
+  roundLabel.className = 'study-learn-round' + (studyRound === 2 ? ' round2' : '');
+
+  document.getElementById('studyHint').textContent = '';
+  document.getElementById('studyFeedback').textContent = '';
+  document.getElementById('studyFeedback').style.color = '';
+
+  var input = document.getElementById('studyInput');
+  input.value = '';
+  input.className = 'study-learn-input';
+  input.placeholder = '输入英文词伙（第 ' + studyRound + ' 遍）...';
+  input.focus();
+}
+
+/* 输入框回车提交 */
+document.getElementById('studyInput').onkeydown = function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    submitStudyInput();
+  }
+};
+
+/* 提交学习输入 */
+function submitStudyInput() {
+  var val = document.getElementById('studyInput').value.trim().toLowerCase();
+  var item = vocab[studyIndex];
+  var input = document.getElementById('studyInput');
+  var hint = document.getElementById('studyHint');
+  var feedback = document.getElementById('studyFeedback');
+
+  if (val === item.en.toLowerCase()) {
+    // 正确
+    input.classList.add('correct');
+    feedback.style.color = '#3fb950';
+    if (studyRound === 1) {
+      feedback.textContent = '✓ 第一遍正确！请再输入第二遍加深印象。';
+      hint.textContent = '';
+      studyRound = 2;
+      var roundLabel = document.getElementById('studyRoundLabel');
+      roundLabel.textContent = '第 2 遍（共需2遍）';
+      roundLabel.className = 'study-learn-round round2';
+      input.value = '';
+      input.className = 'study-learn-input';
+      input.placeholder = '再输入一遍（闭眼或回忆）...';
+      setTimeout(function() { input.focus(); }, 100);
+    } else {
+      // 第二遍也正确，标记完成
+      feedback.textContent = '✓ 两遍全部正确！';
+      var sc = document.getElementById('studyCard_' + studyIndex);
+      if (sc) { sc.classList.add('study-card-done'); }
+      setTimeout(function() {
+        studyIndex++;
+        studyRound = 1;
+        showStudyCard(studyIndex);
+      }, 800);
     }
-  }, 1000);
+  } else {
+    // 错误，轻微抖动
+    input.classList.add('wrong');
+    hint.textContent = '✗ 再试一次，参考英文：' + item.en;
+    hint.style.color = '#f85149';
+    feedback.textContent = '';
+    setTimeout(function() {
+      input.classList.remove('wrong');
+      input.value = '';
+      input.focus();
+    }, 600);
+  }
 }
 
-function updateStudyTimerDisplay() {
-  var min = Math.floor(studyTimeLeft / 60);
-  var sec = studyTimeLeft % 60;
-  var timerEl = document.getElementById('studyTimer');
-  timerEl.textContent =
-    (min < 10 ? '0' + min : min) + ':' + (sec < 10 ? '0' + sec : sec);
-  timerEl.classList.toggle('study-timer-warning', studyTimeLeft <= 30);
+/* 跳过当前词伙 */
+document.getElementById('studySkipBtn').onclick = function() {
+  studySkipped.add(studyIndex);
+  var sc = document.getElementById('studyCard_' + studyIndex);
+  if (sc) {
+    sc.style.opacity = '0.35';
+    sc.style.borderColor = '#f85149';
+  }
+  studyIndex++;
+  studyRound = 1;
+  showStudyCard(studyIndex);
+};
+
+/* 学习全部完成后 → 显示完成按钮 */
+function finishStudy() {
+  document.getElementById('studyCard').classList.remove('active');
+  document.getElementById('studyProgress').textContent = '✅ 全部学习完毕';
+  document.getElementById('studyFeedback').textContent = '';
+  document.getElementById('studySkipBtn').style.display = 'none';
+  var finishBtn = document.getElementById('studyFinishBtn');
+  finishBtn.style.display = '';
+  finishBtn.onclick = startGame;
 }
 
-function endStudy() {
-  clearInterval(studyTimer);
+function startGame() {
   document.getElementById('studyOverlay').style.display = 'none';
   document.getElementById('gameContent').style.display = '';
   createBgParticles();

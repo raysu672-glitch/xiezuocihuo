@@ -701,10 +701,12 @@
   .study-header { text-align: center; margin-bottom: 16px; padding-top: 10px; }
   .study-header h2 { color: #58a6ff; font-size: 22px; margin-bottom: 6px; }
   .study-header p { color: #8b949e; font-size: 13px; }
-  #studyTimer {
-    font-size: 48px; font-weight: 900; color: #ffd700;
-    margin-bottom: 12px; font-family: 'Courier New', monospace;
-    text-shadow: 0 0 20px rgba(255,215,0,0.5);
+  #studyProgress {
+    font-size: 16px; color: #ffd700; font-weight: 700; letter-spacing: 1px;
+    margin-bottom: 8px; font-family: 'Courier New', monospace;
+  }
+  #studyFeedback {
+    font-size: 14px; min-height: 20px; margin-bottom: 8px; font-weight: 600;
   }
   #studySkipBtn {
     padding: 10px 36px; border-radius: 10px; border: 1px solid #30363d;
@@ -712,6 +714,13 @@
     transition: all 0.2s; margin-bottom: 24px;
   }
   #studySkipBtn:hover { background: #30363d; color: #e0e0e0; }
+  #studyFinishBtn {
+    padding: 10px 36px; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, #238636, #2ea043);
+    color: white; font-size: 15px; cursor: pointer; margin-bottom: 24px;
+    transition: all 0.2s;
+  }
+  #studyFinishBtn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(46,160,67,0.4); }
   #studyGrid {
     display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
     max-width: 950px;
@@ -729,6 +738,66 @@
     0% { transform: scale(1); }
     100% { transform: scale(1.08); }
   }
+
+  /* ── 学习交互卡片 ── */
+  .study-learn-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 16px;
+    padding: 28px 36px;
+    text-align: center;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    animation: fadeIn 0.3s;
+  }
+  .study-learn-card.active { display: flex; }
+  .study-learn-zh {
+    font-size: 24px; font-weight: 700; color: #f0f6fc;
+    margin-bottom: 2px;
+  }
+  .study-learn-en-ref {
+    font-size: 13px; color: #484f58; font-family: 'Segoe UI', sans-serif;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .study-learn-round {
+    font-size: 12px; color: #8b949e; letter-spacing: 1px;
+    background: rgba(88,166,255,0.1); padding: 3px 12px;
+    border-radius: 20px; border: 1px solid rgba(88,166,255,0.2);
+  }
+  .study-learn-round.round2 {
+    background: rgba(63,185,80,0.1);
+    border-color: rgba(63,185,80,0.2);
+    color: #3fb950;
+  }
+  .study-learn-input {
+    width: 100%; padding: 12px 20px;
+    border-radius: 12px; border: 2px solid #30363d;
+    background: #0d1117; color: #ffd700;
+    font-size: 20px; text-align: center;
+    outline: none; letter-spacing: 2px;
+    font-family: 'Segoe UI', sans-serif;
+    transition: border-color 0.2s;
+  }
+  .study-learn-input:focus { border-color: #58a6ff; }
+  .study-learn-input.correct { border-color: #3fb950 !important; }
+  .study-learn-input.wrong { border-color: #f85149 !important; }
+  .study-learn-hint {
+    font-size: 12px; color: #484f58; min-height: 16px;
+  }
+  .study-learn-btns {
+    display: flex; gap: 12px; margin-bottom: 24px;
+  }
+  .study-card-done {
+    opacity: 0.5;
+    border-color: #238636 !important;
+  }
+  .study-card-done .study-card-en { color: #3fb950 !important; }
 
   /* ── 语义连线弹窗（交互版）────────────── */
   .synthesis-overlay {
@@ -888,10 +957,25 @@
 <div id="studyOverlay">
   <div class="study-header">
     <h2>📖 课前学习 — 基础必背20词伙</h2>
-    <p>建议先学习 5 分钟，或点击「跳过」直接进入练习</p>
+    <p id="studySubtitle">学习每个词伙的正确拼写，共 20 个词伙</p>
   </div>
-  <div id="studyTimer">05:00</div>
-  <button id="studySkipBtn">跳过 → 直接练习</button>
+  <div id="studyProgress">1 / 20</div>
+  <div id="studyFeedback"></div>
+
+  <div id="studyCard" class="study-learn-card">
+    <div class="study-learn-zh" id="studyLearnZh"></div>
+    <div class="study-learn-en-ref" id="studyLearnEnRef"></div>
+    <div class="study-learn-round" id="studyRoundLabel"></div>
+    <input class="study-learn-input" id="studyInput" type="text"
+           autocomplete="off" spellcheck="false" placeholder="输入英文词伙...">
+    <div class="study-learn-hint" id="studyHint"></div>
+  </div>
+
+  <div class="study-learn-btns">
+    <button id="studySkipBtn">跳过此词伙 →</button>
+    <button id="studyFinishBtn" style="display:none;">完成学习，开始练习 →</button>
+  </div>
+
   <div id="studyGrid"></div>
 </div>
 

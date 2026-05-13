@@ -22,99 +22,95 @@ const vocab = [
 ];
 
 /* ── 语义连线任务 ──
-   动态方案：追踪最近练过的词伙，每完成3题触发一次，
-   对每个词伙从中文含义出发各生成一句改写。
+   机制：每完成3题触发一次，给出3张独立卡片
+   每张卡片：一个带下划线空格的句子 + 3个词伙选项按钮
+   学生必须点击正确的词伙来填空，选对了才显示升级版句子
 */
 const synthesisTemplates = {
-  // key: 词伙英文原文（完全匹配）
-  // plain: 平庸原句（雅思风格，学生先看到）
-  // upgraded: 升级后句子（{phrase} 替换为词伙）
   'a barrage of problems': {
-    plain: '"There are many problems in this area."',
-    upgraded: 'A barrage of problems has emerged in this area.'
+    plain: 'There are <span class="syn-blank">_______</span> in this area.',
+    upgraded: 'There are <span class="syn-phrase-used">a barrage of problems</span> in this area.'
   },
   'a contributing factor': {
-    plain: '"This is one reason for the issue."',
-    upgraded: 'This serves as a contributing factor to the broader issue.'
+    plain: 'This serves as <span class="syn-blank">_______</span> to the broader issue.',
+    upgraded: 'This serves as <span class="syn-phrase-used">a contributing factor</span> to the broader issue.'
   },
   'a focus of attention': {
-    plain: '"Many people are concerned about this."',
-    upgraded: 'This has become a focus of attention for policymakers.'
+    plain: 'This has become <span class="syn-blank">_______</span> for policymakers.',
+    upgraded: 'This has become <span class="syn-phrase-used">a focus of attention</span> for policymakers.'
   },
   'a growing body of evidence': {
-    plain: '"More and more studies show this is true."',
-    upgraded: 'A growing body of evidence suggests this phenomenon is widespread.'
+    plain: '<span class="syn-blank">_______</span> suggests this phenomenon is widespread.',
+    upgraded: '<span class="syn-phrase-used">A growing body of evidence</span> suggests this phenomenon is widespread.'
   },
   'a matter of heightened concern': {
-    plain: '"People are paying more attention to this issue."',
-    upgraded: 'This has become a matter of heightened concern in modern society.'
+    plain: 'This has become <span class="syn-blank">_______</span> in modern society.',
+    upgraded: 'This has become <span class="syn-phrase-used">a matter of heightened concern</span> in modern society.'
   },
   'a more feasible approach': {
-    plain: '"This way of solving the problem is better and easier."',
-    upgraded: 'Policymakers should adopt a more feasible approach to address it.'
+    plain: 'Policymakers should adopt <span class="syn-blank">_______</span> to address it.',
+    upgraded: 'Policymakers should adopt <span class="syn-phrase-used">a more feasible approach</span> to address it.'
   },
   'a sense of fulfillment': {
-    plain: '"People feel happy when they achieve something."',
-    upgraded: 'Volunteer work can provide a sense of fulfillment for participants.'
+    plain: 'Volunteer work can provide <span class="syn-blank">_______</span> for participants.',
+    upgraded: 'Volunteer work can provide <span class="syn-phrase-used">a sense of fulfillment</span> for participants.'
   },
   'a very shortsighted view': {
-    plain: '"Only thinking about immediate benefits is not good."',
-    upgraded: 'This represents a very shortsighted view of long-term development.'
+    plain: 'This represents <span class="syn-blank">_______</span> of long-term development.',
+    upgraded: 'This represents <span class="syn-phrase-used">a very shortsighted view</span> of long-term development.'
   },
   'a vital component': {
-    plain: '"Education is important for solving this problem."',
-    upgraded: 'Education is a vital component of any effective solution.'
+    plain: 'Education is <span class="syn-blank">_______</span> of any effective solution.',
+    upgraded: 'Education is <span class="syn-phrase-used">a vital component</span> of any effective solution.'
   },
   'a wealth of information': {
-    plain: '"The internet gives people lots of data."',
-    upgraded: 'The internet provides a wealth of information at our fingertips.'
+    plain: 'The internet provides <span class="syn-blank">_______</span> at our fingertips.',
+    upgraded: 'The internet provides <span class="syn-phrase-used">a wealth of information</span> at our fingertips.'
   },
   'a well-known fact': {
-    plain: '"Everyone knows that smoking is harmful."',
-    upgraded: 'It is a well-known fact that smoking causes serious health issues.'
+    plain: 'It is <span class="syn-blank">_______</span> that smoking causes serious health issues.',
+    upgraded: 'It is <span class="syn-phrase-used">a well-known fact</span> that smoking causes serious health issues.'
   },
   'a wide range of options': {
-    plain: '"There are many different choices available."',
-    upgraded: 'Consumers now have a wide range of options in the marketplace.'
+    plain: 'Consumers now have <span class="syn-blank">_______</span> in the marketplace.',
+    upgraded: 'Consumers now have <span class="syn-phrase-used">a wide range of options</span> in the marketplace.'
   },
   'ample evidence': {
-    plain: '"There is a lot of proof for this claim."',
-    upgraded: 'There is ample evidence that early intervention is highly effective.'
+    plain: 'There is <span class="syn-blank">_______</span> that early intervention is highly effective.',
+    upgraded: 'There is <span class="syn-phrase-used">ample evidence</span> that early intervention is highly effective.'
   },
   'primary cause': {
-    plain: '"The main reason for this is economic factors."',
-    upgraded: 'Unemployment remains the primary cause of social unrest in the region.'
+    plain: 'Unemployment remains <span class="syn-blank">_______</span> of social unrest in the region.',
+    upgraded: 'Unemployment remains <span class="syn-phrase-used">primary cause</span> of social unrest in the region.'
   },
   'the crux of a problem': {
-    plain: '"The key to solving this is better communication."',
-    upgraded: 'The crux of a problem often lies in miscommunication between groups.'
+    plain: '<span class="syn-blank">_______</span> often lies in miscommunication between groups.',
+    upgraded: '<span class="syn-phrase-used">The crux of a problem</span> often lies in miscommunication between groups.'
   },
   'the looming crisis': {
-    plain: '"There may be a big problem coming in the future."',
-    upgraded: 'Climate change represents the looming crisis of our generation.'
+    plain: 'Climate change represents <span class="syn-blank">_______</span> of our generation.',
+    upgraded: 'Climate change represents <span class="syn-phrase-used">the looming crisis</span> of our generation.'
   },
   'the major barrier': {
-    plain: '"The biggest difficulty is lack of money."',
-    upgraded: 'Funding shortages remain the major barrier to innovation.'
+    plain: 'Funding shortages remain <span class="syn-blank">_______</span> to innovation.',
+    upgraded: 'Funding shortages remain <span class="syn-phrase-used">the major barrier</span> to innovation.'
   },
   'a sense of self-fulfillment': {
-    plain: '"People feel satisfied when they reach their goals."',
-    upgraded: 'Career advancement often brings a sense of self-fulfillment.'
+    plain: 'Career advancement often brings <span class="syn-blank">_______</span>.',
+    upgraded: 'Career advancement often brings <span class="syn-phrase-used">a sense of self-fulfillment</span>.'
   },
   'compelling evidence': {
-    plain: '"There are strong proofs that this method works."',
-    upgraded: 'There is compelling evidence that regular exercise improves mental health.'
+    plain: 'There is <span class="syn-blank">_______</span> that regular exercise improves mental health.',
+    upgraded: 'There is <span class="syn-phrase-used">compelling evidence</span> that regular exercise improves mental health.'
   },
   'compelling reasons': {
-    plain: '"There are good arguments for doing this."',
-    upgraded: 'There are compelling reasons to invest in renewable energy now.'
+    plain: 'There are <span class="syn-blank">_______</span> to invest in renewable energy now.',
+    upgraded: 'There are <span class="syn-phrase-used">compelling reasons</span> to invest in renewable energy now.'
   }
 };
 
-let recentPhrases = []; // 最近练过的词伙（最多3个），用于触发语义连线
-let synthesisFired = false; // 本轮（每3题）是否已触发过一次
-
-
+let recentPhrases = [];   // 最近练过的词伙（最多3个）
+let synthesisFired = false; // 本轮是否已触发过语义连线
 
 let currentIndex = 0;
 let energy = 0;
@@ -264,6 +260,22 @@ function playFeverStartSound() {
     });
   } catch(e) {}
 }
+function playCorrectTick() {
+  if (!audioCtx) return;
+  try {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1100, audioCtx.currentTime + 0.06);
+    gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.12);
+  } catch(e) {}
+}
 
 /* ── 迷雾模式 ── */
 function generateFogWord(word) {
@@ -314,7 +326,7 @@ function showFogModal(word) {
 
   let fogCloseCalled = false;
   function close(success) {
-    if (fogCloseCalled) return;   // 防止重复调用
+    if (fogCloseCalled) return;
     fogCloseCalled = true;
     overlay.remove();
     if (success) {
@@ -359,7 +371,6 @@ function selectWordAfterFog(word) {
   });
   updateAnswerSlots();
 
-  // Fever 模式下答案槽被 CSS 隐藏，强制短暂显示让学生看到词已进槽
   const slotsEl = document.getElementById('answerSlots');
   if (feverMode) {
     slotsEl.style.setProperty('display', 'flex', 'important');
@@ -368,7 +379,6 @@ function selectWordAfterFog(word) {
     }, 1200);
   }
 
-  // 视觉反馈：答案区高亮，让学生看到词已进槽
   slotsEl.style.boxShadow = '0 0 18px rgba(63,185,80,0.6)';
   setTimeout(function(){ slotsEl.style.boxShadow = ''; }, 800);
 }
@@ -437,7 +447,7 @@ function loadQuestion() {
   document.getElementById('feverProgress').textContent = '';
 
   clearedFogWords = new Set();
-  questionFailed = false;  // 加载新题时重置失败标记
+  questionFailed = false;
   selectedWords = [];
   buildWordPool(q);
   updateAnswerSlots();
@@ -576,16 +586,14 @@ function handleCorrect() {
   if (combo > maxCombo) maxCombo = combo;
 
   if (!questionFailed) {
-    // 本题未答错过，正常加能量
     const gain = Math.min(20 + (combo - 1) * 5, 35);
     energy = Math.min(energy + gain, 100);
   }
-  // 曾答错：能量不变，combo 仍累计但不加能量
 
   updateEnergyBar();
   updateStats();
   playCorrectSound();
-  questionFailed = false;  // 重置，进入下一题
+  questionFailed = false;
 
   if (feverMode) {
     showFeverCorrectEffect();
@@ -609,17 +617,17 @@ function handleCorrect() {
       enterFeverMode();
     }
     // 语义连线：追踪最近正确完成的词伙，每3题触发一次
-    var q = vocab[currentIndex - 1]; // 当前题（刚答对的那题）
+    var q = vocab[currentIndex - 1];
     if (q) {
       recentPhrases.push({ zh: q.zh, en: q.en });
       if (recentPhrases.length > 3) recentPhrases.shift();
     }
     if (recentPhrases.length === 3 && !synthesisFired) {
       synthesisFired = true;
-      var phrasesToShow = recentPhrases.slice(); // 触发时保存当前3个词伙
-      recentPhrases = []; // 清空队列，防止弹窗关闭后立即再次触发
+      var phrasesToShow = recentPhrases.slice();
+      recentPhrases = [];
       showSynthesisModal(phrasesToShow);
-      return; // loadQuestion 交给弹窗关闭后调用
+      return;
     }
     loadQuestion();
   }, delay);
@@ -650,15 +658,13 @@ function showWrongEffect(correctAnswer, callback) {
 function handleWrong(correctAnswer) {
   combo = 0;
   totalAnswered++;
-  // 答错扣能量
   energy = Math.max(energy - 20, 0);
-  questionFailed = true;  // 标记本题曾答错，重试答对也不加能量
+  questionFailed = true;
   updateEnergyBar();
   updateStats();
   playWrongSound();
 
   if (feverMode) {
-    // Fever 模式答错：额外再扣 30 能量，并退出 fever
     energy = Math.max(energy - 30, 0);
     updateEnergyBar();
     flashScreen('#f85149');
@@ -673,7 +679,6 @@ function handleWrong(correctAnswer) {
 
   shakeScreen();
   showWrongEffect(correctAnswer, function() {
-    // 清空选择，留在同一题让学生重试
     selectedWords = [];
     document.querySelectorAll('.word-btn').forEach(function(b) { b.classList.remove('selected'); });
     updateAnswerSlots();
@@ -895,7 +900,7 @@ document.addEventListener('keydown', function(e) {
     }
     return;
   }
-  if (e.key === 'Enter' && !document.getElementById('fogModal')) checkAnswer();
+  if (e.key === 'Enter' && !document.getElementById('fogModal') && !document.getElementById('synthesisOverlay')) checkAnswer();
   if (e.key === 'Backspace' && selectedWords.length > 0 && !feverMode) {
     e.preventDefault();
     removeLastWord();
@@ -915,70 +920,126 @@ document.getElementById('feverInput').addEventListener('input', function() {
   }
 });
 
-/* ── 语义连线弹窗 ── */
+/* ── 语义连线弹窗（交互版）──────────────
+   每张卡片：带下划线空格的句子 + 3个词伙按钮
+   学生必须点击正确的词伙来填空，选对了才显示升级版句子
+─────────────────────────────────────── */
 function showSynthesisModal(phrases) {
   var overlay = document.createElement('div');
   overlay.className = 'synthesis-overlay';
+  overlay.id = 'synthesisOverlay';
 
-  // 构建3个独立卡片
+  // 构建3张独立卡片
   var cardsHtml = '';
   phrases.forEach(function(phrase, i) {
     var tpl = synthesisTemplates[phrase.en] || {
-      plain: 'This is an important issue.',
-      upgraded: phrase.en + ' is a critical factor in this context.'
+      plain: 'This is an <span class="syn-blank">_______</span> issue.',
+      upgraded: 'This is <span class="syn-phrase-used">' + phrase.en + '</span>.'
     };
+
+    // 生成选项：正确答案 + 从其他两个词伙随机选一个凑够选项
+    var wrongOptions = phrases
+      .filter(function(p) { return p.en !== phrase.en; })
+      .map(function(p) { return p.en; });
+    // 如果只有1个词伙（边界情况），从全部词伙里补一个
+    if (wrongOptions.length < 1) {
+      var allKeys = Object.keys(synthesisTemplates);
+      for (var k = 0; k < allKeys.length; k++) {
+        if (allKeys[k] !== phrase.en && wrongOptions.indexOf(allKeys[k]) === -1) {
+          wrongOptions.push(allKeys[k]);
+          break;
+        }
+      }
+    }
+    var options = [phrase.en].concat(wrongOptions).sort(function() { return Math.random() - 0.5; });
+
+    var optionsHtml = options.map(function(opt) {
+      return '<button class="syn-option-btn" data-phrase="' + opt + '">' + opt + '</button>';
+    }).join('');
+
     cardsHtml +=
       '<div class="syn-card" id="synCard' + i + '">' +
-        '<div class="syn-card-phrase">' + phrase.zh + ' <span class="syn-en">(' + phrase.en + ')</span></div>' +
-        '<div class="syn-card-plain">' +
-          '<span class="syn-label syn-label-bad">原句</span>' +
-          '<span class="syn-plain-text">' + tpl.plain + '</span>' +
+        '<div class="syn-card-phrase">' + phrase.zh + '</div>' +
+        '<div class="syn-sentence-box" id="synSentence' + i + '">' +
+          '<span class="syn-label syn-label-orig">原句</span> ' +
+          '<span class="syn-plain-text" id="synPlain' + i + '">' + tpl.plain + '</span>' +
         '</div>' +
-        '<div class="syn-card-reveal" id="synReveal' + i + '">' +
-          '<button class="syn-reveal-btn" id="synRevealBtn' + i + '">揭晓答案 ✨</button>' +
-        '</div>' +
-        '<div class="syn-card-upgraded" id="synUpgraded' + i + '" style="display:none">' +
-          '<span class="syn-label syn-label-good">升级版</span>' +
+        '<div class="syn-upgraded-box" id="synUpgraded' + i + '" style="display:none">' +
+          '<span class="syn-label syn-label-good">升级版</span> ' +
           '<span class="syn-upgraded-text">' + tpl.upgraded + '</span>' +
         '</div>' +
+        '<div class="syn-options-row" id="synOptions' + i + '">' +
+          '<span class="syn-option-hint">用刚练过的词伙填空：</span>' +
+          optionsHtml +
+        '</div>' +
+        '<div class="syn-feedback" id="synFeedback' + i + '"></div>' +
       '</div>';
   });
 
   overlay.innerHTML =
-    '<div class="synthesis-modal" style="max-width:700px;">' +
+    '<div class="synthesis-modal" style="max-width:680px;">' +
       '<div class="synthesis-badge">✏️ CONTEXTUAL SYNTHESIS · 语义连线</div>' +
-      '<div class="synthesis-title">检测理解深度 — 用刚学过的词伙升级以下句子</div>' +
+      '<div class="synthesis-title">用刚学过的词伙升级句子 — 点击正确选项填空</div>' +
       '<div class="syn-cards-container" id="synCardsContainer">' + cardsHtml + '</div>' +
-      '<div class="syn-progress" id="synProgress">已揭晓 0 / 3</div>' +
+      '<div class="syn-progress" id="synProgress">已解决 0 / 3</div>' +
       '<div class="syn-result-msg" id="synResultMsg"></div>' +
-      '<button class="synthesis-skip-btn" id="synSkipBtn">跳过，继续练习</button>' +
+      '<button class="synthesis-skip-btn" id="synSkipBtn">跳过，继续练习 →</button>' +
     '</div>';
 
   document.body.appendChild(overlay);
 
-  var revealed = 0;
+  var solved = 0;
 
   phrases.forEach(function(phrase, i) {
-    var btn = document.getElementById('synRevealBtn' + i);
-    if (!btn) return;
-    btn.onclick = function() {
-      var revealDiv = document.getElementById('synReveal' + i);
-      var upgradedDiv = document.getElementById('synUpgraded' + i);
-      revealDiv.style.display = 'none';
-      upgradedDiv.style.display = 'block';
-      revealed++;
-      document.getElementById('synProgress').textContent = '已揭晓 ' + revealed + ' / ' + phrases.length;
-      playCorrectTick();
+    var optionBtns = document.querySelectorAll('#synCard' + i + ' .syn-option-btn');
+    optionBtns.forEach(function(btn) {
+      btn.onclick = function() {
+        var chosen = btn.dataset.phrase;
+        var card = document.getElementById('synCard' + i);
+        var feedback = document.getElementById('synFeedback' + i);
+        var optionsRow = document.getElementById('synOptions' + i);
+        var upgradedBox = document.getElementById('synUpgraded' + i);
+        var sentenceBox = document.getElementById('synSentence' + i);
 
-      if (revealed === phrases.length) {
-        document.getElementById('synResultMsg').className = 'syn-result-msg success';
-        document.getElementById('synResultMsg').textContent = '🎉 完美！词伙已深度掌握！';
-        document.getElementById('synSkipBtn').textContent = '继续练习 →';
-        spawnParticles();
-        playCorrectSound();
-        setTimeout(closeModal, 2000);
-      }
-    };
+        if (chosen === phrase.en) {
+          // 答对了
+          btn.classList.add('syn-opt-correct');
+          playCorrectTick();
+
+          // 显示升级版句子
+          var tpl = synthesisTemplates[phrase.en];
+          sentenceBox.style.display = 'none';
+          upgradedBox.style.display = 'block';
+
+          // 禁用其他按钮
+          optionBtns.forEach(function(b) { b.disabled = true; });
+
+          solved++;
+          document.getElementById('synProgress').textContent = '已解决 ' + solved + ' / ' + phrases.length;
+
+          if (solved === phrases.length) {
+            document.getElementById('synResultMsg').className = 'syn-result-msg success';
+            document.getElementById('synResultMsg').textContent = '🎉 全部正确！词伙已深度掌握！';
+            document.getElementById('synSkipBtn').textContent = '继续练习 →';
+            spawnParticles();
+            playCorrectSound();
+            setTimeout(closeModal, 2200);
+          }
+        } else {
+          // 答错了，轻微抖动
+          btn.classList.add('syn-opt-wrong');
+          card.classList.add('syn-card-shake');
+          playWrongSound();
+          feedback.className = 'syn-feedback syn-feedback-wrong';
+          feedback.textContent = '✗ 不对，再试试！';
+          setTimeout(function() {
+            btn.classList.remove('syn-opt-wrong');
+            card.classList.remove('syn-card-shake');
+            feedback.textContent = '';
+          }, 800);
+        }
+      };
+    });
   });
 
   function closeModal() {
@@ -988,24 +1049,6 @@ function showSynthesisModal(phrases) {
   }
 
   document.getElementById('synSkipBtn').onclick = closeModal;
-}
-
-
-function playCorrectTick() {
-  if (!audioCtx) return;
-  try {
-    var osc = audioCtx.createOscillator();
-    var gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1100, audioCtx.currentTime + 0.06);
-    gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.12);
-  } catch(e) {}
 }
 
 init();

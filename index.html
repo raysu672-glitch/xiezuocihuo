@@ -730,7 +730,7 @@
     100% { transform: scale(1.08); }
   }
 
-  /* ── 语义连线弹窗（卡片版） ── */
+  /* ── 语义连线弹窗（交互版）────────────── */
   .synthesis-overlay {
     position: fixed; top:0; left:0; right:0; bottom:0;
     background: rgba(0,0,0,0.82);
@@ -743,9 +743,11 @@
     border: 1px solid #30363d;
     border-radius: 20px;
     padding: 28px 32px 24px;
-    max-width: 700px; width: 92%;
+    max-width: 700px; width: 94%;
     box-shadow: 0 24px 80px rgba(0,0,0,0.6);
     text-align: center;
+    max-height: 90vh;
+    overflow-y: auto;
   }
   .synthesis-badge {
     display: inline-block;
@@ -758,7 +760,7 @@
     font-size: 13px; color: #8b949e; margin-bottom: 18px;
   }
   .syn-cards-container {
-    display: flex; flex-direction: column; gap: 12px;
+    display: flex; flex-direction: column; gap: 14px;
     margin-bottom: 16px;
   }
   .syn-card {
@@ -766,49 +768,102 @@
     border: 1px solid #21262d;
     border-radius: 12px; padding: 14px 18px;
     text-align: left;
-    transition: border-color 0.2s;
+    transition: border-color 0.25s;
   }
   .syn-card-phrase {
-    font-size: 14px; color: #f0f6fc; font-weight: 600;
+    font-size: 13px; color: #58a6ff; font-weight: 600;
     margin-bottom: 8px;
   }
-  .syn-card-phrase .syn-en {
-    font-size: 13px; color: #58a6ff; font-weight: 400;
-  }
-  .syn-card-plain {
+  .syn-sentence-box {
     display: flex; align-items: flex-start; gap: 10px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .syn-upgraded-box {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 10px;
+    animation: fadeIn 0.4s;
   }
   .syn-label {
     font-size: 10px; font-weight: 700; letter-spacing: 1px;
     padding: 2px 8px; border-radius: 4px;
     white-space: nowrap; flex-shrink: 0; margin-top: 2px;
   }
-  .syn-label-bad { background: rgba(248,81,73,0.15); color: #f85149; }
+  .syn-label-orig { background: rgba(248,81,73,0.12); color: #f85149; }
   .syn-label-good { background: rgba(63,185,80,0.15); color: #3fb950; }
-  .syn-plain-text {
-    font-size: 14px; color: #8b949e; font-style: italic;
-    line-height: 1.5;
+  .syn-blank {
+    display: inline-block;
+    color: #ffd700;
+    text-decoration: underline;
+    text-decoration-color: #ffd700;
+    text-underline-offset: 4px;
+    font-style: normal;
+    padding: 0 4px;
+    background: rgba(255,215,0,0.08);
+    border-radius: 3px;
+    letter-spacing: 1px;
   }
-  .syn-card-upgraded {
-    display: flex; align-items: flex-start; gap: 10px;
-    animation: fadeIn 0.4s;
+  .syn-plain-text {
+    font-size: 15px; color: #8b949e; font-style: italic;
+    line-height: 1.6; flex: 1;
   }
   .syn-upgraded-text {
-    font-size: 14px; color: #3fb950; font-weight: 600;
-    line-height: 1.5;
+    font-size: 15px; color: #3fb950; font-weight: 600;
+    line-height: 1.6; flex: 1;
   }
-  .syn-reveal-btn {
-    padding: 7px 20px; border-radius: 8px;
-    border: 1px solid #30363d; background: #21262d;
-    color: #58a6ff; font-size: 13px; cursor: pointer;
-    transition: all 0.2s; font-family: 'Segoe UI', sans-serif;
+  .syn-phrase-used {
+    color: #ffd700; font-style: normal; font-weight: 700;
   }
-  .syn-reveal-btn:hover {
-    background: rgba(88,166,255,0.1);
+  .syn-options-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px; margin-bottom: 6px;
+  }
+  .syn-option-hint {
+    font-size: 12px; color: #484f58; margin-right: 4px;
+  }
+  .syn-option-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #30363d;
+    background: #161b22;
+    color: #c9d1d9;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .syn-option-btn:hover {
     border-color: #58a6ff;
+    background: rgba(88,166,255,0.1);
+    color: #e0e0e0;
     transform: translateY(-1px);
   }
+  .syn-option-btn.syn-opt-correct {
+    border-color: #3fb950 !important;
+    background: rgba(63,185,80,0.15) !important;
+    color: #3fb950 !important;
+    cursor: default;
+    transform: none;
+  }
+  .syn-option-btn.syn-opt-wrong {
+    border-color: #f85149 !important;
+    background: rgba(248,81,73,0.1) !important;
+    color: #f85149 !important;
+  }
+  .syn-card-shake {
+    animation: synCardShake 0.45s;
+  }
+  @keyframes synCardShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  .syn-feedback {
+    font-size: 13px; min-height: 18px;
+    margin-top: 4px; font-weight: 600;
+  }
+  .syn-feedback-wrong { color: #f85149; animation: fadeIn 0.2s; }
   .syn-progress {
     font-size: 12px; color: #484f58; margin-bottom: 10px;
     letter-spacing: 1px;

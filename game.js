@@ -585,6 +585,13 @@ function handleCorrect() {
   totalAnswered++;
   if (combo > maxCombo) maxCombo = combo;
 
+  // 立即记录刚答对的词伙（在 setTimeout 之外，避免时序问题）
+  var justAnswered = vocab[currentIndex];
+  if (justAnswered) {
+    recentPhrases.push({ zh: justAnswered.zh, en: justAnswered.en });
+    if (recentPhrases.length > 3) recentPhrases.shift();
+  }
+
   if (!questionFailed) {
     const gain = Math.min(20 + (combo - 1) * 5, 35);
     energy = Math.min(energy + gain, 100);
@@ -616,12 +623,7 @@ function handleCorrect() {
     if (!feverMode && (energy >= 100 || combo >= 5)) {
       enterFeverMode();
     }
-    // 语义连线：追踪最近正确完成的词伙，每3题触发一次
-    var q = vocab[currentIndex - 1];
-    if (q) {
-      recentPhrases.push({ zh: q.zh, en: q.en });
-      if (recentPhrases.length > 3) recentPhrases.shift();
-    }
+    // 语义连线：检查最近3个词伙是否集齐
     if (recentPhrases.length === 3 && !synthesisFired) {
       synthesisFired = true;
       var phrasesToShow = recentPhrases.slice();

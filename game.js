@@ -392,7 +392,7 @@ function enterFeverMode() {
   document.getElementById('questionHint').textContent = '⚡ FEVER MODE — 直接打字输入！';
   document.getElementById('questionHint').style.color = '#ffd700';
 
-  feverTimeLeft = 23;
+  feverTimeLeft = 50;
   updateFeverTimer();
   feverTimer = setInterval(function() {
     feverTimeLeft--;
@@ -605,7 +605,7 @@ function handleCorrect() {
   if (feverMode) {
     showFeverCorrectEffect();
     spawnFeverParticles();
-    feverTimeLeft = Math.min(feverTimeLeft + 5, 15);
+    feverTimeLeft = Math.min(feverTimeLeft + 5, 50);
     updateFeverTimer();
   } else {
     showCorrectEffect();

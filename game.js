@@ -77,6 +77,7 @@ const synthesisGroups = [
 let synthesisDone = new Set(); // 已触发过的 afterCount 值，防止重复弹出
 
 
+let currentIndex = 0;
 let energy = 0;
 let combo = 0;
 let maxCombo = 0;

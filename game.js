@@ -1,4 +1,5 @@
-const vocab = [
+/* ── 基础词伙（原始数据）── */
+const foundationVocab = [
   { zh: "一系列的问题", en: "a barrage of problems" },
   { zh: "一个产生影响的因素", en: "a contributing factor" },
   { zh: "关注的焦点", en: "a focus of attention" },
@@ -21,11 +22,7 @@ const vocab = [
   { zh: "令人信服的理由", en: "compelling reasons" }
 ];
 
-/* ── 语义连线任务 ──
-   机制：每完成3题触发一次，给出3张独立卡片
-   每张卡片：一个带下划线空格的句子 + 3个词伙选项按钮
-   学生必须点击正确的词伙来填空，选对了才显示升级版句子
-*/
+/* ── 语义连线模板（基础词伙）── */
 const synthesisTemplates = {
   'a barrage of problems': {
     plain: 'There are <span class="syn-blank">_______</span> in this area.',
@@ -109,42 +106,166 @@ const synthesisTemplates = {
   }
 };
 
-let recentPhrases = [];   // 最近练过的词伙（最多3个）
-let synthesisFired = false; // 本轮是否已触发过语义连线
+/* ══════════════════════════════════════════════════
+   分类选择页面逻辑
+══════════════════════════════════════════════════ */
+var currentCategoryId = null;
+var vocab = [];  // 当前分类词伙（动态设置）
 
-let currentIndex = 0;
-let energy = 0;
-let combo = 0;
-let maxCombo = 0;
-let totalAnswered = 0;
-let totalCorrect = 0;
-let selectedWords = [];
-let isProcessing = false;
-let fogMode = false;
-let feverMode = false;
-let feverTimer = null;
-let feverTimeLeft = 0;
-let audioCtx = null;
-let clearedFogWords = new Set();
-let questionFailed = false;
+function buildCategoryPage() {
+  var gridXiao = document.getElementById('gridXiaoZuoWen');
+  var gridDa   = document.getElementById('gridDaZuoWen');
 
-let studyTimer = null;
-let studyTimeLeft = 300;
+  allCategories.forEach(function(cat, idx) {
+    var card = document.createElement('button');
+    card.className = 'cat-card';
+    card.style.animationDelay = (0.05 * idx) + 's';
+    card.innerHTML =
+      '<div class="cat-card-icon">' + cat.icon + '</div>' +
+      '<div class="cat-card-name">' + cat.name + '</div>' +
+      '<div class="cat-card-count">' + cat.vocab.length + ' 条词伙</div>' +
+      '<div class="cat-card-arrow">开始练习 ›</div>';
+    card.onclick = function() { selectCategory(cat.id); };
 
-/* ── 学习页面（逐个输入两遍）─────────────
-   每个词伙：先显示英文参考 → 学生输入第一遍 → 显示结果
-          → 再输入第二遍 → 标记完成 → 下一个词伙
-   可随时跳过，跳过后该词伙变灰
-──────────────────────────────────────── */
-let studyIndex = 0;
-let studyRound = 1;   // 1 = 第一遍，2 = 第二遍
-let studySkipped = new Set();  // 跳过的词伙索引
+    if (cat.group === '小作文') {
+      gridXiao.appendChild(card);
+    } else {
+      gridDa.appendChild(card);
+    }
+  });
+}
 
-function init() {
+function selectCategory(catId) {
+  var catName, catVocab;
+
+  if (catId === '__foundation__') {
+    catName  = '⭐ 基础必背词伙';
+    catVocab = foundationVocab;
+  } else {
+    var cat = allCategories.find(function(c) { return c.id === catId; });
+    if (!cat) return;
+    catName  = cat.icon + ' ' + cat.name;
+    catVocab = cat.vocab;
+  }
+
+  currentCategoryId = catId;
+  vocab = catVocab.slice();   // 副本，shuffle不影响原数组
+
+  // 更新 header 徽章
+  document.getElementById('headerCatBadge').textContent = catName;
+
+  // 更新学习页标题
+  document.getElementById('studyTitle').textContent = '📖 课前学习 — ' + catName;
+  document.getElementById('studySubtitle').textContent =
+    '学习每个词伙的正确拼写，共 ' + vocab.length + ' 个词伙';
+
+  // 隐藏分类页，显示学习页
+  document.getElementById('categoryPage').style.display = 'none';
+  document.getElementById('studyOverlay').style.display = 'flex';
+
+  // 重置学习状态
+  resetStudyState();
   populateStudyPage();
   showStudyCard(studyIndex);
 }
 
+function backToCategory() {
+  // 停止 Fever 计时器
+  if (feverTimer) clearInterval(feverTimer);
+  feverMode  = false;
+  document.body.classList.remove('fever');
+
+  // 隐藏游戏，显示分类页
+  document.getElementById('gameContent').style.display = 'none';
+  document.getElementById('studyOverlay').style.display = 'none';
+  document.getElementById('categoryPage').style.display = 'flex';
+
+  // 移除 finish overlay（如有）
+  var fo = document.querySelector('.finish-overlay');
+  if (fo) fo.remove();
+}
+
+/* ══════════════════════════════════════════════════
+   语义连线（动态：优先用模板，无模板则生成通用句）
+══════════════════════════════════════════════════ */
+var recentPhrases = [];
+var synthesisFired = false;
+
+/* ══════════════════════════════════════════════════
+   游戏状态
+══════════════════════════════════════════════════ */
+var currentIndex = 0;
+var energy = 0;
+var combo = 0;
+var maxCombo = 0;
+var totalAnswered = 0;
+var totalCorrect = 0;
+var selectedWords = [];
+var isProcessing = false;
+var fogMode = false;
+var feverMode = false;
+var feverTimer = null;
+var feverTimeLeft = 0;
+var audioCtx = null;
+var clearedFogWords = new Set();
+var questionFailed = false;
+
+var studyTimer = null;
+var studyTimeLeft = 300;
+
+/* ── 学习页状态 ── */
+var studyIndex = 0;
+var studyRound = 1;
+var studySkipped = new Set();
+
+function resetStudyState() {
+  studyIndex   = 0;
+  studyRound   = 1;
+  studySkipped = new Set();
+  document.getElementById('studySkipBtn').style.display = '';
+  document.getElementById('studyFinishBtn').style.display = 'none';
+  document.getElementById('studyCard').classList.remove('active');
+  document.getElementById('studyFeedback').textContent = '';
+  document.getElementById('studyInput').value = '';
+}
+
+function resetGameState() {
+  currentIndex   = 0;
+  energy         = 0;
+  combo          = 0;
+  maxCombo       = 0;
+  totalAnswered  = 0;
+  totalCorrect   = 0;
+  selectedWords  = [];
+  isProcessing   = false;
+  fogMode        = false;
+  recentPhrases  = [];
+  synthesisFired = false;
+  clearedFogWords = new Set();
+  questionFailed  = false;
+
+  // 清除 Fever 残留
+  if (feverTimer) clearInterval(feverTimer);
+  feverTimer  = null;
+  feverMode   = false;
+  feverTimeLeft = 0;
+  document.body.classList.remove('fever');
+
+  var oldTimer = document.getElementById('feverTimerDisplay');
+  if (oldTimer) oldTimer.remove();
+
+  document.getElementById('feverInput').value = '';
+  document.getElementById('feverProgress').textContent = '';
+  document.getElementById('questionHint').textContent = '👆 点击英文单词组成答案 →';
+  document.getElementById('questionHint').style.color = '';
+
+  updateEnergyBar();
+  updateStats();
+}
+
+/* ══════════════════════════════════════════════════
+   学习页面
+══════════════════════════════════════════════════ */
 function populateStudyPage() {
   var grid = document.getElementById('studyGrid');
   grid.innerHTML = '';
@@ -152,16 +273,14 @@ function populateStudyPage() {
     var card = document.createElement('div');
     card.className = 'study-card';
     card.id = 'studyCard_' + idx;
-    card.innerHTML = '<div class="study-card-zh">' + item.zh + '</div>' +
-                     '<div class="study-card-en">' + item.en + '</div>';
-    card.onclick = function() {
-      jumpToStudyItem(idx);
-    };
+    card.innerHTML =
+      '<div class="study-card-zh">' + item.zh + '</div>' +
+      '<div class="study-card-en">' + item.en + '</div>';
+    card.onclick = function() { jumpToStudyItem(idx); };
     grid.appendChild(card);
   });
 }
 
-/* 跳转/聚焦到某个词伙开始学习 */
 function jumpToStudyItem(idx) {
   studyIndex = idx;
   studyRound = 1;
@@ -169,16 +288,13 @@ function jumpToStudyItem(idx) {
   showStudyCard(idx);
 }
 
-/* 显示当前学习卡片 */
 function showStudyCard(idx) {
   if (idx >= vocab.length) {
     finishStudy();
     return;
   }
-
   var item = vocab[idx];
-  var progress = (studyIndex + 1) + ' / ' + vocab.length;
-  document.getElementById('studyProgress').textContent = progress;
+  document.getElementById('studyProgress').textContent = (studyIndex + 1) + ' / ' + vocab.length;
 
   var card = document.getElementById('studyCard');
   card.classList.add('active');
@@ -201,7 +317,6 @@ function showStudyCard(idx) {
   input.focus();
 }
 
-/* 输入框回车提交 */
 document.getElementById('studyInput').onkeydown = function(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -209,16 +324,14 @@ document.getElementById('studyInput').onkeydown = function(e) {
   }
 };
 
-/* 提交学习输入 */
 function submitStudyInput() {
-  var val = document.getElementById('studyInput').value.trim().toLowerCase();
-  var item = vocab[studyIndex];
-  var input = document.getElementById('studyInput');
-  var hint = document.getElementById('studyHint');
+  var val      = document.getElementById('studyInput').value.trim().toLowerCase();
+  var item     = vocab[studyIndex];
+  var input    = document.getElementById('studyInput');
+  var hint     = document.getElementById('studyHint');
   var feedback = document.getElementById('studyFeedback');
 
   if (val === item.en.toLowerCase()) {
-    // 正确
     input.classList.add('correct');
     feedback.style.color = '#3fb950';
     if (studyRound === 1) {
@@ -233,7 +346,6 @@ function submitStudyInput() {
       input.placeholder = '再输入一遍（闭眼或回忆）...';
       setTimeout(function() { input.focus(); }, 100);
     } else {
-      // 第二遍也正确，标记完成
       feedback.textContent = '✓ 两遍全部正确！';
       var sc = document.getElementById('studyCard_' + studyIndex);
       if (sc) { sc.classList.add('study-card-done'); }
@@ -244,7 +356,6 @@ function submitStudyInput() {
       }, 800);
     }
   } else {
-    // 错误，轻微抖动
     input.classList.add('wrong');
     hint.textContent = '✗ 再试一次，参考英文：' + item.en;
     hint.style.color = '#f85149';
@@ -257,7 +368,6 @@ function submitStudyInput() {
   }
 }
 
-/* 跳过当前词伙 */
 document.getElementById('studySkipBtn').onclick = function() {
   studySkipped.add(studyIndex);
   var sc = document.getElementById('studyCard_' + studyIndex);
@@ -270,7 +380,6 @@ document.getElementById('studySkipBtn').onclick = function() {
   showStudyCard(studyIndex);
 };
 
-/* 学习全部完成后 → 显示完成按钮 */
 function finishStudy() {
   document.getElementById('studyCard').classList.remove('active');
   document.getElementById('studyProgress').textContent = '✅ 全部学习完毕';
@@ -284,6 +393,7 @@ function finishStudy() {
 function startGame() {
   document.getElementById('studyOverlay').style.display = 'none';
   document.getElementById('gameContent').style.display = '';
+  resetGameState();
   createBgParticles();
   shuffleVocab();
   loadQuestion();
@@ -291,13 +401,13 @@ function startGame() {
 }
 
 function shuffleVocab() {
-  for (let i = vocab.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [vocab[i], vocab[j]] = [vocab[j], vocab[i]];
+  for (var i = vocab.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = vocab[i]; vocab[i] = vocab[j]; vocab[j] = tmp;
   }
 }
 
-/* ── Web Audio 音效 ── */
+/* ── Web Audio ── */
 function initAudio() {
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -306,66 +416,56 @@ function initAudio() {
 function playKeySound() {
   if (!audioCtx) return;
   try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = 'square';
     osc.frequency.setValueAtTime(2800 + Math.random()*1200, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.04);
     gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.05);
+    osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.05);
   } catch(e) {}
 }
 function playCorrectSound() {
   if (!audioCtx) return;
   try {
-    [523, 659, 784].forEach((freq, i) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
+    [523, 659, 784].forEach(function(freq, i) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.1, audioCtx.currentTime + i*0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i*0.1 + 0.2);
-      osc.start(audioCtx.currentTime + i*0.1);
-      osc.stop(audioCtx.currentTime + i*0.1 + 0.25);
+      osc.start(audioCtx.currentTime + i*0.1); osc.stop(audioCtx.currentTime + i*0.1 + 0.25);
     });
   } catch(e) {}
 }
 function playWrongSound() {
   if (!audioCtx) return;
   try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(200, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.2);
     gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.25);
+    osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.25);
   } catch(e) {}
 }
 function playFeverStartSound() {
   if (!audioCtx) return;
   try {
-    [523, 659, 784, 1047].forEach((freq, i) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
+    [523, 659, 784, 1047].forEach(function(freq, i) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i*0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i*0.08 + 0.15);
-      osc.start(audioCtx.currentTime + i*0.08);
-      osc.stop(audioCtx.currentTime + i*0.08 + 0.2);
+      osc.start(audioCtx.currentTime + i*0.08); osc.stop(audioCtx.currentTime + i*0.08 + 0.2);
     });
   } catch(e) {}
 }
@@ -374,31 +474,29 @@ function playCorrectTick() {
   try {
     var osc = audioCtx.createOscillator();
     var gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = 'sine';
     osc.frequency.setValueAtTime(880, audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(1100, audioCtx.currentTime + 0.06);
     gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.12);
+    osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.12);
   } catch(e) {}
 }
 
 /* ── 迷雾模式 ── */
 function generateFogWord(word) {
   if (word.length <= 2) return word;
-  const arr = word.split('');
-  const hideCount = Math.max(1, Math.floor(arr.length * (0.3 + Math.random()*0.2)));
-  const indices = [];
-  for (let i = 1; i < arr.length - 1; i++) indices.push(i);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
+  var arr = word.split('');
+  var hideCount = Math.max(1, Math.floor(arr.length * (0.3 + Math.random()*0.2)));
+  var indices = [];
+  for (var i = 1; i < arr.length - 1; i++) indices.push(i);
+  for (var i = indices.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
   }
-  const hideIdx = new Set(indices.slice(0, Math.min(hideCount, indices.length)));
-  return arr.map((ch, i) => hideIdx.has(i) ? '_' : ch).join('');
+  var hideIdx = new Set(indices.slice(0, Math.min(hideCount, indices.length)));
+  return arr.map(function(ch, i) { return hideIdx.has(i) ? '_' : ch; }).join('');
 }
 
 function showFogModal(word) {
@@ -406,16 +504,13 @@ function showFogModal(word) {
     selectWordAfterFog(word);
     return;
   }
-
-  const fogDisplay = generateFogWord(word);
-  const overlay = document.createElement('div');
+  var fogDisplay = generateFogWord(word);
+  var overlay = document.createElement('div');
   overlay.className = 'fog-modal-overlay';
   overlay.id = 'fogModal';
-
-  const displayHtml = fogDisplay.split('').map(function(ch) {
+  var displayHtml = fogDisplay.split('').map(function(ch) {
     return ch === '_' ? '<span style="color:#f85149">_</span>' : ch;
   }).join('');
-
   overlay.innerHTML =
     '<div class="fog-modal">' +
       '<h3>🔮 迷雾模式 — 补全单词</h3>' +
@@ -429,11 +524,11 @@ function showFogModal(word) {
     '</div>';
   document.body.appendChild(overlay);
 
-  const input = document.getElementById('fogInput');
-  const result = document.getElementById('fogResult');
+  var input = document.getElementById('fogInput');
+  var result = document.getElementById('fogResult');
   input.focus();
 
-  let fogCloseCalled = false;
+  var fogCloseCalled = false;
   function close(success) {
     if (fogCloseCalled) return;
     fogCloseCalled = true;
@@ -480,14 +575,11 @@ function selectWordAfterFog(word) {
   });
   updateAnswerSlots();
 
-  const slotsEl = document.getElementById('answerSlots');
+  var slotsEl = document.getElementById('answerSlots');
   if (feverMode) {
     slotsEl.style.setProperty('display', 'flex', 'important');
-    setTimeout(function() {
-      slotsEl.style.removeProperty('display');
-    }, 1200);
+    setTimeout(function() { slotsEl.style.removeProperty('display'); }, 1200);
   }
-
   slotsEl.style.boxShadow = '0 0 18px rgba(63,185,80,0.6)';
   setTimeout(function(){ slotsEl.style.boxShadow = ''; }, 800);
 }
@@ -526,7 +618,7 @@ function exitFeverMode() {
 }
 
 function updateFeverTimer() {
-  let timerEl = document.getElementById('feverTimerDisplay');
+  var timerEl = document.getElementById('feverTimerDisplay');
   if (!timerEl) {
     timerEl = document.createElement('div');
     timerEl.id = 'feverTimerDisplay';
@@ -544,11 +636,10 @@ function loadQuestion() {
     showFinish();
     return;
   }
-
-  const oldTimer = document.getElementById('feverTimerDisplay');
+  var oldTimer = document.getElementById('feverTimerDisplay');
   if (oldTimer) oldTimer.remove();
 
-  const q = vocab[currentIndex];
+  var q = vocab[currentIndex];
   document.getElementById('questionNum').textContent = String(currentIndex+1).padStart(2,'0') + ' / ' + vocab.length;
   document.getElementById('questionChinese').textContent = q.zh;
   document.getElementById('progress').textContent = currentIndex + '/' + vocab.length;
@@ -556,8 +647,8 @@ function loadQuestion() {
   document.getElementById('feverProgress').textContent = '';
 
   clearedFogWords = new Set();
-  questionFailed = false;
-  selectedWords = [];
+  questionFailed  = false;
+  selectedWords   = [];
   buildWordPool(q);
   updateAnswerSlots();
 
@@ -569,33 +660,36 @@ function loadQuestion() {
 
 /* ── 构建选词池 ── */
 function buildWordPool(q) {
-  const pool = document.getElementById('wordPool');
+  var pool = document.getElementById('wordPool');
   pool.innerHTML = '';
 
-  const correctWords = q.en.split(' ');
-  let allWords = correctWords.slice();
+  var correctWords = q.en.split(' ');
+  var allWords = correctWords.slice();
 
-  const otherWords = vocab
-    .filter(function(_, i) { return i !== currentIndex; })
-    .flatMap(function(v) { return v.en.split(' '); })
-    .sort(function() { return Math.random() - 0.5; });
+  var otherWords = [];
+  vocab.forEach(function(v, i) {
+    if (i !== currentIndex) {
+      v.en.split(' ').forEach(function(w) { otherWords.push(w); });
+    }
+  });
+  otherWords.sort(function() { return Math.random() - 0.5; });
 
-  const targetCount = Math.max(correctWords.length + 4, 8);
-  for (let i = 0; allWords.length < targetCount && i < otherWords.length; i++) {
+  var targetCount = Math.max(correctWords.length + 4, 8);
+  for (var i = 0; allWords.length < targetCount && i < otherWords.length; i++) {
     if (allWords.indexOf(otherWords[i]) === -1) {
       allWords.push(otherWords[i]);
     }
   }
-  allWords = allWords.sort(function() { return Math.random() - 0.5; });
+  allWords.sort(function() { return Math.random() - 0.5; });
 
   allWords.forEach(function(word) {
-    const btn = document.createElement('button');
+    var btn = document.createElement('button');
     btn.className = 'word-btn';
     btn.dataset.word = word;
 
     if (fogMode && !clearedFogWords.has(word)) {
       btn.classList.add('fogged');
-      const fogged = generateFogWord(word);
+      var fogged = generateFogWord(word);
       btn.innerHTML = '<span class="fog-text">' + fogged + '</span>';
       btn.onclick = function() {
         if (isProcessing) return;
@@ -611,7 +705,7 @@ function buildWordPool(q) {
 
 function toggleWord(word, btn) {
   if (isProcessing) return;
-  const idx = selectedWords.indexOf(word);
+  var idx = selectedWords.indexOf(word);
   if (idx >= 0) {
     selectedWords.splice(idx, 1);
     btn.classList.remove('selected');
@@ -623,10 +717,10 @@ function toggleWord(word, btn) {
 }
 
 function updateAnswerSlots() {
-  const slotsEl = document.getElementById('answerSlots');
+  var slotsEl = document.getElementById('answerSlots');
   slotsEl.innerHTML = '';
   if (selectedWords.length === 0) {
-    const hint = document.createElement('span');
+    var hint = document.createElement('span');
     hint.style.color = '#484f58';
     hint.style.fontSize = '15px';
     hint.textContent = feverMode ? '输入答案后按 Enter →' : '点击上方单词组成答案 →';
@@ -634,7 +728,7 @@ function updateAnswerSlots() {
     return;
   }
   selectedWords.forEach(function(word) {
-    const slot = document.createElement('div');
+    var slot = document.createElement('div');
     slot.className = 'slot filled';
     slot.textContent = word;
     slotsEl.appendChild(slot);
@@ -650,10 +744,10 @@ function clearSelection() {
 
 function removeLastWord() {
   if (isProcessing || selectedWords.length === 0) return;
-  const word = selectedWords.pop();
-  const btns = [];
+  var word = selectedWords.pop();
+  var btns = [];
   document.querySelectorAll('.word-btn.selected').forEach(function(b) { btns.push(b); });
-  for (let i = btns.length - 1; i >= 0; i--) {
+  for (var i = btns.length - 1; i >= 0; i--) {
     if (btns[i].textContent === word) {
       btns[i].classList.remove('selected');
       break;
@@ -666,10 +760,9 @@ function checkAnswer() {
   if (isProcessing) return;
   isProcessing = true;
 
-  const q = vocab[currentIndex];
-
+  var q = vocab[currentIndex];
   if (feverMode) {
-    let userAnswer = document.getElementById('feverInput').value.trim().replace(/\s+/g, ' ');
+    var userAnswer = document.getElementById('feverInput').value.trim().replace(/\s+/g, ' ');
     if (userAnswer.toLowerCase() === q.en.toLowerCase()) {
       handleCorrect();
     } else {
@@ -677,8 +770,8 @@ function checkAnswer() {
     }
   } else {
     if (selectedWords.length === 0) { isProcessing = false; return; }
-    const userSorted = selectedWords.map(function(w) { return w.toLowerCase(); }).sort().join(' ');
-    const ansSorted = q.en.toLowerCase().split(' ').sort().join(' ');
+    var userSorted = selectedWords.map(function(w) { return w.toLowerCase(); }).sort().join(' ');
+    var ansSorted  = q.en.toLowerCase().split(' ').sort().join(' ');
     if (userSorted === ansSorted) {
       handleCorrect();
     } else {
@@ -694,7 +787,6 @@ function handleCorrect() {
   totalAnswered++;
   if (combo > maxCombo) maxCombo = combo;
 
-  // 立即记录刚答对的词伙（在 setTimeout 之外，避免时序问题）
   var justAnswered = vocab[currentIndex];
   if (justAnswered) {
     recentPhrases.push({ zh: justAnswered.zh, en: justAnswered.en });
@@ -702,10 +794,9 @@ function handleCorrect() {
   }
 
   if (!questionFailed) {
-    const gain = Math.min(20 + (combo - 1) * 5, 35);
+    var gain = Math.min(20 + (combo - 1) * 5, 35);
     energy = Math.min(energy + gain, 100);
   }
-
   updateEnergyBar();
   updateStats();
   playCorrectSound();
@@ -725,14 +816,13 @@ function handleCorrect() {
     }
   }
 
-  const delay = feverMode ? 600 : (combo >= 3 ? 1200 : 800);
+  var delay = feverMode ? 600 : (combo >= 3 ? 1200 : 800);
   setTimeout(function() {
     currentIndex++;
     isProcessing = false;
     if (!feverMode && (energy >= 100 || combo >= 5)) {
       enterFeverMode();
     }
-    // 语义连线：检查最近3个词伙是否集齐
     if (recentPhrases.length === 3 && !synthesisFired) {
       synthesisFired = true;
       var phrasesToShow = recentPhrases.slice();
@@ -746,9 +836,9 @@ function handleCorrect() {
 
 /* ── 答错 ── */
 function showWrongEffect(correctAnswer, callback) {
-  const box = document.getElementById('questionBox');
+  var box = document.getElementById('questionBox');
   box.classList.add('shake');
-  const hint = document.createElement('div');
+  var hint = document.createElement('div');
   hint.id = 'wrongHint';
   hint.style.cssText = 'margin-top:16px;font-size:20px;color:#f85149;animation:fadeIn 0.3s;';
   hint.innerHTML = '✗ 正确答案：<span style="color:#3fb950;font-size:22px;">' + correctAnswer + '</span>';
@@ -759,7 +849,7 @@ function showWrongEffect(correctAnswer, callback) {
   flashScreen('#f85149');
   setTimeout(function() {
     box.classList.remove('shake');
-    const oldHint = document.getElementById('wrongHint');
+    var oldHint = document.getElementById('wrongHint');
     if (oldHint) oldHint.remove();
     document.querySelectorAll('.word-btn.wrong-flash').forEach(function(b) { b.classList.remove('wrong-flash'); });
     if (callback) callback();
@@ -799,10 +889,10 @@ function handleWrong(correctAnswer) {
 
 /* ── 特效 ── */
 function showCorrectEffect() {
-  const overlay = document.createElement('div');
+  var overlay = document.createElement('div');
   overlay.className = 'correct-overlay';
-  const msgs = ['正确!', '太棒了!', '完美!', '厉害!', 'Nice!'];
-  const text = document.createElement('div');
+  var msgs = ['正确!', '太棒了!', '完美!', '厉害!', 'Nice!'];
+  var text = document.createElement('div');
   text.className = 'correct-text';
   if (combo >= 2) text.classList.add('combo-' + Math.min(combo, 5));
   text.textContent = msgs[Math.floor(Math.random() * msgs.length)];
@@ -812,28 +902,27 @@ function showCorrectEffect() {
 }
 
 function showFeverCorrectEffect() {
-  const overlay = document.createElement('div');
+  var overlay = document.createElement('div');
   overlay.className = 'fever-correct-overlay';
-  const text = document.createElement('div');
+  var text = document.createElement('div');
   text.className = 'fever-correct-text';
-  const msgs = ['PERFECT!', 'AMAZING!', 'BRILLIANT!', 'YES!'];
+  var msgs = ['PERFECT!', 'AMAZING!', 'BRILLIANT!', 'YES!'];
   text.textContent = msgs[Math.floor(Math.random() * msgs.length)];
   overlay.appendChild(text);
   document.body.appendChild(overlay);
   setTimeout(function() { overlay.remove(); }, 700);
-
   document.getElementById('centerPanel').classList.add('fever-shake');
   setTimeout(function() { document.getElementById('centerPanel').classList.remove('fever-shake'); }, 500);
 }
 
 function spawnParticles() {
-  const colors = ['#3fb950', '#58a6ff', '#bc8cff', '#f778ba', '#ffd700'];
-  for (let i = 0; i < 18; i++) {
-    const p = document.createElement('div');
+  var colors = ['#3fb950', '#58a6ff', '#bc8cff', '#f778ba', '#ffd700'];
+  for (var i = 0; i < 18; i++) {
+    var p = document.createElement('div');
     p.className = 'particle';
     p.style.background = colors[Math.floor(Math.random() * colors.length)];
     p.style.left = (window.innerWidth / 2 + (Math.random() - 0.5) * 200) + 'px';
-    p.style.top = (window.innerHeight / 2) + 'px';
+    p.style.top  = (window.innerHeight / 2) + 'px';
     p.style.setProperty('--tx', (Math.random() - 0.5) * 400 + 'px');
     p.style.setProperty('--ty', (Math.random() - 1) * 300 + 'px');
     document.body.appendChild(p);
@@ -842,13 +931,13 @@ function spawnParticles() {
 }
 
 function spawnFeverParticles() {
-  const colors = ['#ffd700', '#ff6b35', '#ff0080', '#00c8ff', '#bc8cff'];
-  for (let i = 0; i < 12; i++) {
-    const p = document.createElement('div');
+  var colors = ['#ffd700', '#ff6b35', '#ff0080', '#00c8ff', '#bc8cff'];
+  for (var i = 0; i < 12; i++) {
+    var p = document.createElement('div');
     p.className = 'fever-particle';
     p.style.color = colors[Math.floor(Math.random() * colors.length)];
-    p.style.left = (window.innerWidth / 2 + (Math.random() - 0.5) * 300) + 'px';
-    p.style.top = (window.innerHeight / 2) + 'px';
+    p.style.left  = (window.innerWidth / 2 + (Math.random() - 0.5) * 300) + 'px';
+    p.style.top   = (window.innerHeight / 2) + 'px';
     p.style.setProperty('--tx', (Math.random() - 0.5) * 300 + 'px');
     p.style.setProperty('--ty', (Math.random() - 1) * 250 + 'px');
     p.textContent = ['✦', '★', '⚡', '✧', '💥'][Math.floor(Math.random()*5)];
@@ -858,13 +947,13 @@ function spawnFeverParticles() {
 }
 
 function spawnFeverKeyParticle() {
-  const input = document.getElementById('feverInput');
-  const rect = input.getBoundingClientRect();
-  const p = document.createElement('div');
+  var input = document.getElementById('feverInput');
+  var rect  = input.getBoundingClientRect();
+  var p = document.createElement('div');
   p.className = 'fever-particle';
   p.style.color = ['#ffd700','#ff6b35','#00c8ff'][Math.floor(Math.random()*3)];
-  p.style.left = (rect.left + Math.random()*rect.width) + 'px';
-  p.style.top = (rect.top - 10) + 'px';
+  p.style.left  = (rect.left + Math.random()*rect.width) + 'px';
+  p.style.top   = (rect.top - 10) + 'px';
   p.style.setProperty('--tx', (Math.random()-0.5)*80+'px');
   p.style.setProperty('--ty', (-20 - Math.random()*40)+'px');
   p.textContent = ['·','✦','•'][Math.floor(Math.random()*3)];
@@ -873,31 +962,33 @@ function spawnFeverKeyParticle() {
 }
 
 function spawnFireworks() {
-  const colors = ['#ffd700', '#ff6b35', '#bc8cff', '#3fb950', '#58a6ff'];
-  const cx = window.innerWidth / 2;
-  const cy = window.innerHeight / 2;
-  for (let i = 0; i < 30; i++) {
-    const fw = document.createElement('div');
-    fw.className = 'firework';
-    fw.style.background = colors[Math.floor(Math.random() * colors.length)];
-    fw.style.left = cx + 'px';
-    fw.style.top = cy + 'px';
-    const angle = (Math.PI * 2 / 30) * i;
-    const dist = 100 + Math.random() * 200;
-    fw.style.transition = 'all 0.8s ease-out';
-    document.body.appendChild(fw);
-    requestAnimationFrame(function() {
-      fw.style.transform = 'translate(' + Math.cos(angle)*dist + 'px, ' + Math.sin(angle)*dist + 'px)';
-      fw.style.opacity = '0';
-    });
-    setTimeout(function() { fw.remove(); }, 900);
+  var colors = ['#ffd700', '#ff6b35', '#bc8cff', '#3fb950', '#58a6ff'];
+  var cx = window.innerWidth / 2;
+  var cy = window.innerHeight / 2;
+  for (var i = 0; i < 30; i++) {
+    (function(i) {
+      var fw = document.createElement('div');
+      fw.className = 'firework';
+      fw.style.background = colors[Math.floor(Math.random() * colors.length)];
+      fw.style.left = cx + 'px';
+      fw.style.top  = cy + 'px';
+      var angle = (Math.PI * 2 / 30) * i;
+      var dist  = 100 + Math.random() * 200;
+      fw.style.transition = 'all 0.8s ease-out';
+      document.body.appendChild(fw);
+      requestAnimationFrame(function() {
+        fw.style.transform = 'translate(' + Math.cos(angle)*dist + 'px, ' + Math.sin(angle)*dist + 'px)';
+        fw.style.opacity = '0';
+      });
+      setTimeout(function() { fw.remove(); }, 900);
+    })(i);
   }
 }
 
 function flashScreen(color) {
-  const cls = feverMode ? 'fever-flash' : 'flash-overlay';
-  const flash = document.createElement('div');
-  flash.className = cls;
+  var cls   = feverMode ? 'fever-flash' : 'flash-overlay';
+  var flash = document.createElement('div');
+  flash.className  = cls;
   flash.style.background = color;
   document.body.appendChild(flash);
   setTimeout(function() { flash.remove(); }, feverMode ? 300 : 600);
@@ -910,13 +1001,13 @@ function shakeScreen() {
 
 /* ── 更新能量槽 ── */
 function updateEnergyBar() {
-  const bar = document.getElementById('energyBar');
-  const val = document.getElementById('energyValue');
-  const emojis = document.getElementById('energyEmojis');
-  const comboEl = document.getElementById('comboValue');
+  var bar    = document.getElementById('energyBar');
+  var val    = document.getElementById('energyValue');
+  var emojis = document.getElementById('energyEmojis');
+  var comboEl = document.getElementById('comboValue');
 
   bar.style.height = energy + '%';
-  val.textContent = energy;
+  val.textContent  = energy;
 
   bar.classList.remove('mid', 'high', 'max');
   if (energy >= 80) bar.classList.add('max');
@@ -925,7 +1016,7 @@ function updateEnergyBar() {
 
   if (energy >= 50 && !fogMode) {
     fogMode = true;
-    const hint = document.getElementById('questionHint');
+    var hint = document.getElementById('questionHint');
     if (hint && !feverMode) {
       hint.textContent = '🔮 迷雾模式激活！点击残缺单词补全字母';
       hint.style.color = '#58a6ff';
@@ -936,7 +1027,7 @@ function updateEnergyBar() {
         }
       }, 3000);
     }
-    const q = vocab[currentIndex];
+    var q = vocab[currentIndex];
     if (q) buildWordPool(q);
   }
 
@@ -959,17 +1050,17 @@ function updateEnergyBar() {
 
 function updateStats() {
   document.getElementById('correctCount').textContent = totalCorrect;
-  const acc = totalAnswered > 0 ? Math.round(totalCorrect / totalAnswered * 100) : 0;
+  var acc = totalAnswered > 0 ? Math.round(totalCorrect / totalAnswered * 100) : 0;
   document.getElementById('accuracy').textContent = acc + '%';
 }
 
 /* ── 完成画面 ── */
 function showFinish() {
   exitFeverMode();
-  const overlay = document.createElement('div');
+  var overlay = document.createElement('div');
   overlay.className = 'finish-overlay';
-  const pct = Math.round(totalCorrect / vocab.length * 100);
-  let msg;
+  var pct = Math.round(totalCorrect / vocab.length * 100);
+  var msg;
   if (totalCorrect === vocab.length) msg = '🌟 完美通关！你是词伙大师！';
   else if (totalCorrect >= vocab.length * 0.8) msg = '👍 很棒！继续加油！';
   else msg = '💪 多多练习，下次更好！';
@@ -980,19 +1071,29 @@ function showFinish() {
     '<p>正确率：' + pct + '%</p>' +
     '<p>最大连击：x' + maxCombo + '</p>' +
     '<p style="margin-top:20px;font-size:16px;color:#58a6ff;">' + msg + '</p>' +
-    '<button class="btn-restart" onclick="location.reload()">再来一次 🔄</button>';
+    '<div class="finish-btns">' +
+      '<button class="btn-back-to-cat" onclick="backToCategory()">← 返回分类</button>' +
+      '<button class="btn-restart" onclick="restartCurrentCat()">再来一次 🔄</button>' +
+    '</div>';
   document.body.appendChild(overlay);
   spawnFireworks();
   setTimeout(spawnFireworks, 300);
 }
 
-/* ── 背景装饰粒子 ── */
+function restartCurrentCat() {
+  var overlay = document.querySelector('.finish-overlay');
+  if (overlay) overlay.remove();
+  // 重新进入当前分类的学习页
+  selectCategory(currentCategoryId);
+}
+
+/* ── 背景粒子 ── */
 function createBgParticles() {
-  for (let i = 0; i < 30; i++) {
-    const p = document.createElement('div');
+  for (var i = 0; i < 30; i++) {
+    var p = document.createElement('div');
     p.className = 'bg-particle';
-    p.style.left = Math.random() * 100 + 'vw';
-    p.style.top = Math.random() * 100 + 'vh';
+    p.style.left    = Math.random() * 100 + 'vw';
+    p.style.top     = Math.random() * 100 + 'vh';
     p.style.opacity = (0.1 + Math.random() * 0.3).toString();
     document.body.appendChild(p);
   }
@@ -1020,52 +1121,46 @@ document.addEventListener('keydown', function(e) {
 
 /* Fever 输入框实时反馈 */
 document.getElementById('feverInput').addEventListener('input', function() {
-  const q = vocab[currentIndex];
+  var q = vocab[currentIndex];
   if (!q) return;
-  const val = this.value.toLowerCase();
-  const ans = q.en.toLowerCase();
-  if (ans.indexOf(val) === 0) {
-    this.style.borderColor = 'rgba(255,215,0,0.6)';
-  } else {
-    this.style.borderColor = 'rgba(248,81,73,0.6)';
-  }
+  var val = this.value.toLowerCase();
+  var ans = q.en.toLowerCase();
+  this.style.borderColor = ans.indexOf(val) === 0
+    ? 'rgba(255,215,0,0.6)'
+    : 'rgba(248,81,73,0.6)';
 });
 
-/* ── 语义连线弹窗（交互版）──────────────
-   每张卡片：带下划线空格的句子 + 3个词伙按钮
-   学生必须点击正确的词伙来填空，选对了才显示升级版句子
-─────────────────────────────────────── */
+/* ── 语义连线弹窗 ── */
 function showSynthesisModal(phrases) {
   var overlay = document.createElement('div');
   overlay.className = 'synthesis-overlay';
   overlay.id = 'synthesisOverlay';
 
-  // 构建3张独立卡片
   var cardsHtml = '';
   phrases.forEach(function(phrase, i) {
+    // 尝试从 synthesisTemplates 取模板，否则生成通用句
     var tpl = synthesisTemplates[phrase.en] || {
-      plain: 'This is an <span class="syn-blank">_______</span> issue.',
-      upgraded: 'This is <span class="syn-phrase-used">' + phrase.en + '</span>.'
+      plain: 'This can be described as <span class="syn-blank">_______</span>.',
+      upgraded: 'This can be described as <span class="syn-phrase-used">' + phrase.en + '</span>.'
     };
 
-    // 生成选项：正确答案 + 从其他两个词伙随机选一个凑够选项
     var wrongOptions = phrases
       .filter(function(p) { return p.en !== phrase.en; })
       .map(function(p) { return p.en; });
-    // 如果只有1个词伙（边界情况），从全部词伙里补一个
+
     if (wrongOptions.length < 1) {
-      var allKeys = Object.keys(synthesisTemplates);
-      for (var k = 0; k < allKeys.length; k++) {
-        if (allKeys[k] !== phrase.en && wrongOptions.indexOf(allKeys[k]) === -1) {
-          wrongOptions.push(allKeys[k]);
+      var allEnKeys = Object.keys(synthesisTemplates);
+      for (var k = 0; k < allEnKeys.length; k++) {
+        if (allEnKeys[k] !== phrase.en && wrongOptions.indexOf(allEnKeys[k]) === -1) {
+          wrongOptions.push(allEnKeys[k]);
           break;
         }
       }
     }
-    var options = [phrase.en].concat(wrongOptions).sort(function() { return Math.random() - 0.5; });
 
+    var options = [phrase.en].concat(wrongOptions).sort(function() { return Math.random() - 0.5; });
     var optionsHtml = options.map(function(opt) {
-      return '<button class="syn-option-btn" data-phrase="' + opt + '">' + opt + '</button>';
+      return '<button class="syn-option-btn" data-phrase="' + opt.replace(/'/g, '&#39;') + '">' + opt + '</button>';
     }).join('');
 
     cardsHtml +=
@@ -1092,7 +1187,7 @@ function showSynthesisModal(phrases) {
       '<div class="synthesis-badge">✏️ CONTEXTUAL SYNTHESIS · 语义连线</div>' +
       '<div class="synthesis-title">用刚学过的词伙升级句子 — 点击正确选项填空</div>' +
       '<div class="syn-cards-container" id="synCardsContainer">' + cardsHtml + '</div>' +
-      '<div class="syn-progress" id="synProgress">已解决 0 / 3</div>' +
+      '<div class="syn-progress" id="synProgress">已解决 0 / ' + phrases.length + '</div>' +
       '<div class="syn-result-msg" id="synResultMsg"></div>' +
       '<button class="synthesis-skip-btn" id="synSkipBtn">跳过，继续练习 →</button>' +
     '</div>';
@@ -1105,26 +1200,19 @@ function showSynthesisModal(phrases) {
     var optionBtns = document.querySelectorAll('#synCard' + i + ' .syn-option-btn');
     optionBtns.forEach(function(btn) {
       btn.onclick = function() {
-        var chosen = btn.dataset.phrase;
-        var card = document.getElementById('synCard' + i);
-        var feedback = document.getElementById('synFeedback' + i);
+        var chosen     = btn.dataset.phrase;
+        var card       = document.getElementById('synCard' + i);
+        var feedback   = document.getElementById('synFeedback' + i);
         var optionsRow = document.getElementById('synOptions' + i);
-        var upgradedBox = document.getElementById('synUpgraded' + i);
-        var sentenceBox = document.getElementById('synSentence' + i);
+        var upgradedBox  = document.getElementById('synUpgraded' + i);
+        var sentenceBox  = document.getElementById('synSentence' + i);
 
         if (chosen === phrase.en) {
-          // 答对了
           btn.classList.add('syn-opt-correct');
           playCorrectTick();
-
-          // 显示升级版句子
-          var tpl = synthesisTemplates[phrase.en];
-          sentenceBox.style.display = 'none';
-          upgradedBox.style.display = 'block';
-
-          // 禁用其他按钮
+          sentenceBox.style.display  = 'none';
+          upgradedBox.style.display  = 'block';
           optionBtns.forEach(function(b) { b.disabled = true; });
-
           solved++;
           document.getElementById('synProgress').textContent = '已解决 ' + solved + ' / ' + phrases.length;
 
@@ -1137,7 +1225,6 @@ function showSynthesisModal(phrases) {
             setTimeout(closeModal, 2200);
           }
         } else {
-          // 答错了，轻微抖动
           btn.classList.add('syn-opt-wrong');
           card.classList.add('syn-card-shake');
           playWrongSound();
@@ -1162,4 +1249,7 @@ function showSynthesisModal(phrases) {
   document.getElementById('synSkipBtn').onclick = closeModal;
 }
 
-init();
+/* ══════════════════════════════════════════════════
+   初始化：构建分类页（不自动开始游戏）
+══════════════════════════════════════════════════ */
+buildCategoryPage();

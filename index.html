@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>基础必背20词伙 - 选词练习</title>
+<title>写作词伙选词练习</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -63,6 +63,153 @@
     100% { left: 0%; }
   }
 
+  /* ══════════════════════════════════════
+     分类选择页
+  ══════════════════════════════════════ */
+  #categoryPage {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #0a0e17;
+    z-index: 600;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 20px 40px;
+  }
+
+  .cat-hero {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .cat-hero h1 {
+    font-size: 28px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #58a6ff, #bc8cff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .cat-hero p {
+    font-size: 14px;
+    color: #484f58;
+    letter-spacing: 1px;
+  }
+
+  /* 基础词伙专属卡片 */
+  .cat-foundation-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 780px;
+    padding: 20px 28px;
+    border-radius: 16px;
+    border: 2px solid rgba(88,166,255,0.3);
+    background: linear-gradient(135deg, rgba(88,166,255,0.08), rgba(188,140,255,0.06));
+    cursor: pointer;
+    transition: all 0.25s;
+    margin-bottom: 28px;
+    text-align: left;
+  }
+  .cat-foundation-btn:hover {
+    border-color: #58a6ff;
+    background: linear-gradient(135deg, rgba(88,166,255,0.15), rgba(188,140,255,0.12));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(88,166,255,0.18);
+  }
+  .cat-foundation-icon { font-size: 36px; flex-shrink: 0; }
+  .cat-foundation-info { flex: 1; }
+  .cat-foundation-info h2 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #58a6ff;
+    margin-bottom: 4px;
+  }
+  .cat-foundation-info p { font-size: 13px; color: #8b949e; }
+  .cat-foundation-arrow {
+    font-size: 22px; color: #58a6ff; opacity: 0.7;
+  }
+
+  /* 分组标题 */
+  .cat-group-title {
+    width: 100%;
+    max-width: 780px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #484f58;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  /* 分类网格 */
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 780px;
+    margin-bottom: 28px;
+  }
+
+  .cat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px 18px 14px;
+    border-radius: 14px;
+    border: 1px solid #21262d;
+    background: #161b22;
+    cursor: pointer;
+    transition: all 0.22s;
+    text-align: left;
+  }
+  .cat-card:hover {
+    border-color: #58a6ff;
+    background: rgba(88,166,255,0.06);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 24px rgba(88,166,255,0.14);
+  }
+  .cat-card:active { transform: scale(0.97); }
+
+  .cat-card-icon { font-size: 28px; margin-bottom: 10px; }
+  .cat-card-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 4px;
+  }
+  .cat-card-count { font-size: 12px; color: #484f58; }
+  .cat-card-arrow {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #30363d;
+    letter-spacing: 1px;
+    transition: color 0.2s;
+  }
+  .cat-card:hover .cat-card-arrow { color: #58a6ff; }
+
+  @keyframes catFadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .cat-card, .cat-foundation-btn {
+    animation: catFadeIn 0.4s ease both;
+  }
+
+  .cat-footer {
+    font-size: 11px;
+    color: #21262d;
+    letter-spacing: 2px;
+    margin-top: 8px;
+  }
+
+  /* ══════════════════════════════════════
+     Header
+  ══════════════════════════════════════ */
   .header {
     display: flex;
     justify-content: space-between;
@@ -73,7 +220,30 @@
     position: relative;
     z-index: 10;
   }
+  .header-left { display: flex; align-items: center; gap: 14px; }
   .header h1 { font-size: 17px; color: #58a6ff; }
+  .header-cat-badge {
+    font-size: 12px;
+    color: #8b949e;
+    background: rgba(88,166,255,0.1);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 20px;
+    padding: 3px 10px;
+  }
+  .btn-back-cat {
+    padding: 5px 14px;
+    border-radius: 8px;
+    border: 1px solid #30363d;
+    background: transparent;
+    color: #8b949e;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.18s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-back-cat:hover { border-color: #58a6ff; color: #58a6ff; }
   .header .stats { display: flex; gap: 18px; font-size: 13px; color: #8b949e; }
   .header .stats span b { color: #f0f6fc; }
   .fever-banner {
@@ -641,8 +811,12 @@
   }
   .finish-overlay h2 { font-size: 44px; color: #ffd700; margin-bottom: 14px; }
   .finish-overlay p { font-size: 19px; color: #8b949e; margin-bottom: 8px; }
-  .finish-overlay .btn-restart {
+  .finish-btns {
+    display: flex;
+    gap: 14px;
     margin-top: 24px;
+  }
+  .finish-overlay .btn-restart {
     padding: 12px 40px;
     border-radius: 12px;
     border: none;
@@ -653,6 +827,21 @@
     transition: all 0.2s;
   }
   .finish-overlay .btn-restart:hover { transform: scale(1.05); }
+  .finish-overlay .btn-back-to-cat {
+    padding: 12px 28px;
+    border-radius: 12px;
+    border: 1px solid #30363d;
+    background: transparent;
+    color: #8b949e;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .finish-overlay .btn-back-to-cat:hover {
+    border-color: #58a6ff;
+    color: #58a6ff;
+    transform: scale(1.03);
+  }
 
   @keyframes correctPop {
     0% { transform: scale(0.3); opacity: 0; }
@@ -729,6 +918,7 @@
     background: #161b22; border: 1px solid #21262d; border-radius: 12px;
     padding: 14px 18px; width: 280px;
     transition: all 0.2s;
+    cursor: pointer;
   }
   .study-card:hover { border-color: #58a6ff; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(88,166,255,0.15); }
   .study-card-zh { font-size: 15px; color: #f0f6fc; margin-bottom: 6px; font-weight: 600; }
@@ -799,7 +989,7 @@
   }
   .study-card-done .study-card-en { color: #3fb950 !important; }
 
-  /* ── 语义连线弹窗（交互版）────────────── */
+  /* ── 语义连线弹窗 ── */
   .synthesis-overlay {
     position: fixed; top:0; left:0; right:0; bottom:0;
     background: rgba(0,0,0,0.82);
@@ -953,11 +1143,43 @@
 </head>
 <body>
 
-<!-- 学习页面 -->
-<div id="studyOverlay">
+<!-- ════════════════════════════════════════
+     分类选择页
+════════════════════════════════════════ -->
+<div id="categoryPage">
+  <div class="cat-hero">
+    <h1>✍️ 写作词伙练习</h1>
+    <p>选择一个分类开始练习 · 藕叶英语 苏宁</p>
+  </div>
+
+  <!-- 基础词伙 -->
+  <button class="cat-foundation-btn" onclick="selectCategory('__foundation__')" style="animation-delay:0s">
+    <span class="cat-foundation-icon">⭐</span>
+    <div class="cat-foundation-info">
+      <h2>基础必背词伙</h2>
+      <p>20 个高频核心写作词伙，建议首先掌握</p>
+    </div>
+    <span class="cat-foundation-arrow">›</span>
+  </button>
+
+  <!-- 小作文 -->
+  <div class="cat-group-title">小作文词伙</div>
+  <div class="cat-grid" id="gridXiaoZuoWen"></div>
+
+  <!-- 大作文 -->
+  <div class="cat-group-title">大作文词伙</div>
+  <div class="cat-grid" id="gridDaZuoWen"></div>
+
+  <div class="cat-footer">WRITING VOCABULARY PRACTICE SYSTEM</div>
+</div>
+
+<!-- ════════════════════════════════════════
+     学习页面
+════════════════════════════════════════ -->
+<div id="studyOverlay" style="display:none;">
   <div class="study-header">
-    <h2>📖 课前学习 — 基础必背20词伙</h2>
-    <p id="studySubtitle">学习每个词伙的正确拼写，共 20 个词伙</p>
+    <h2 id="studyTitle">📖 课前学习</h2>
+    <p id="studySubtitle">学习每个词伙的正确拼写</p>
   </div>
   <div id="studyProgress">1 / 20</div>
   <div id="studyFeedback"></div>
@@ -979,13 +1201,19 @@
   <div id="studyGrid"></div>
 </div>
 
-<!-- 游戏内容（默认隐藏） -->
+<!-- ════════════════════════════════════════
+     游戏内容（默认隐藏）
+════════════════════════════════════════ -->
 <div id="gameContent" style="display:none;">
 
 <div class="header">
-  <h1>词伙练习</h1>
+  <div class="header-left">
+    <h1>词伙练习</h1>
+    <span class="header-cat-badge" id="headerCatBadge"></span>
+  </div>
   <div class="fever-banner">FEVER MODE</div>
   <div class="stats">
+    <button class="btn-back-cat" onclick="backToCategory()" title="返回分类">← 分类</button>
     <span>进度 <b id="progress">0/20</b></span>
     <span>正确 <b id="correctCount">0</b></span>
     <span>正确率 <b id="accuracy">0%</b></span>
@@ -1039,6 +1267,7 @@ window.addEventListener('error', function(e) {
   console.log(msg);
 });
 </script>
+<script src="categories.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

@@ -1113,7 +1113,9 @@ document.addEventListener('keydown', function(e) {
     return;
   }
   if (e.key === 'Enter' && !document.getElementById('fogModal') && !document.getElementById('synthesisOverlay')) checkAnswer();
-  if (e.key === 'Backspace' && selectedWords.length > 0 && !feverMode) {
+  var activeEl = document.activeElement;
+  var isTypingInInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+  if (e.key === 'Backspace' && selectedWords.length > 0 && !feverMode && !isTypingInInput) {
     e.preventDefault();
     removeLastWord();
   }

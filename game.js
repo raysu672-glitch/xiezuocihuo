@@ -172,6 +172,22 @@ function selectCategory(catId) {
 }
 
 function backToCategory() {
+  // 发送学习时长给父页面（中途退出也记录）
+  if (phraseStartTime > 0 && window.parent !== window) {
+    var elapsed = Math.floor((Date.now() - phraseStartTime) / 1000);
+    if (elapsed > 5) { // 至少5秒才记录
+      window.parent.postMessage({
+        type: 'phraseStudyComplete',
+        moduleType: 'writing_phrase',
+        categoryId: currentCategoryId,
+        durationSeconds: elapsed,
+        totalCorrect: totalCorrect,
+        totalWords: vocab.length
+      }, '*');
+    }
+    phraseStartTime = 0;
+  }
+  
   // 停止 Fever 计时器
   if (feverTimer) clearInterval(feverTimer);
   feverMode  = false;
@@ -1271,3 +1287,23 @@ function showSynthesisModal(phrases) {
    初始化：构建分类页（不自动开始游戏）
 ══════════════════════════════════════════════════ */
 buildCategoryPage();
+
+/* ── 监听父页面请求保存（主页面返回时触发） ── */
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'requestSave') {
+    if (phraseStartTime > 0 && window.parent !== window) {
+      var elapsed = Math.floor((Date.now() - phraseStartTime) / 1000);
+      if (elapsed > 5) {
+        window.parent.postMessage({
+          type: 'phraseStudyComplete',
+          moduleType: 'writing_phrase',
+          categoryId: currentCategoryId,
+          durationSeconds: elapsed,
+          totalCorrect: totalCorrect,
+          totalWords: vocab.length
+        }, '*');
+      }
+      phraseStartTime = 0;
+    }
+  }
+});

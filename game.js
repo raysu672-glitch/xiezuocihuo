@@ -111,6 +111,7 @@ const synthesisTemplates = {
 ══════════════════════════════════════════════════ */
 var currentCategoryId = null;
 var vocab = [];  // 当前分类词伙（动态设置）
+var phraseStartTime = 0; // 学习开始时间
 
 function buildCategoryPage() {
   var gridXiao = document.getElementById('gridXiaoZuoWen');
@@ -150,6 +151,7 @@ function selectCategory(catId) {
 
   currentCategoryId = catId;
   vocab = catVocab.slice();   // 副本，shuffle不影响原数组
+  phraseStartTime = Date.now(); // 记录学习开始时间
 
   // 更新 header 徽章
   document.getElementById('headerCatBadge').textContent = catName;
@@ -1057,6 +1059,20 @@ function updateStats() {
 /* ── 完成画面 ── */
 function showFinish() {
   exitFeverMode();
+  
+  // 发送学习时长给父页面（iframe 通信）
+  if (phraseStartTime > 0 && window.parent !== window) {
+    var elapsed = Math.floor((Date.now() - phraseStartTime) / 1000);
+    window.parent.postMessage({
+      type: 'phraseStudyComplete',
+      moduleType: 'writing_phrase',
+      categoryId: currentCategoryId,
+      durationSeconds: elapsed,
+      totalCorrect: totalCorrect,
+      totalWords: vocab.length
+    }, '*');
+  }
+  
   var overlay = document.createElement('div');
   overlay.className = 'finish-overlay';
   var pct = Math.round(totalCorrect / vocab.length * 100);

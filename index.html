@@ -887,7 +887,8 @@
     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     z-index: 500; padding: 30px 20px; box-sizing: border-box; overflow-y: auto;
   }
-  .study-header { text-align: center; margin-bottom: 16px; padding-top: 10px; }
+  .study-header { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 16px; padding-top: 10px; }
+  .study-header-content { text-align: center; }
   .study-header h2 { color: #58a6ff; font-size: 22px; margin-bottom: 6px; }
   .study-header p { color: #8b949e; font-size: 13px; }
   #studyProgress {
@@ -1178,8 +1179,11 @@
 ════════════════════════════════════════ -->
 <div id="studyOverlay" style="display:none;">
   <div class="study-header">
-    <h2 id="studyTitle">📖 课前学习</h2>
-    <p id="studySubtitle">学习每个词伙的正确拼写</p>
+    <button class="btn-back-cat" onclick="backToCategory()" title="返回分类">← 分类</button>
+    <div class="study-header-content">
+      <h2 id="studyTitle">📖 课前学习</h2>
+      <p id="studySubtitle">学习每个词伙的正确拼写</p>
+    </div>
   </div>
   <div id="studyProgress">1 / 20</div>
   <div id="studyFeedback"></div>

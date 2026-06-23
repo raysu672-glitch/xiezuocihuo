@@ -1,3 +1,8 @@
+/* ── 规范化字符串：去除空格和标点符号 ── */
+function normalize(str) {
+  return str.toLowerCase().replace(/[\s\.,!?;:'"()\-]/g, '');
+}
+
 /* ── 基础词伙（原始数据）── */
 const foundationVocab = [
   { zh: "一系列的问题", en: "a barrage of problems" },
@@ -349,7 +354,7 @@ function submitStudyInput() {
   var hint     = document.getElementById('studyHint');
   var feedback = document.getElementById('studyFeedback');
 
-  if (val === item.en.toLowerCase()) {
+  if (normalize(val) === normalize(item.en)) {
     input.classList.add('correct');
     feedback.style.color = '#3fb950';
     if (studyRound === 1) {
@@ -559,7 +564,7 @@ function showFogModal(word) {
 
   document.getElementById('fogConfirmBtn').onclick = function() {
     if (fogCloseCalled) return;
-    if (input.value.trim().toLowerCase() === word.toLowerCase()) {
+    if (normalize(input.value) === normalize(word)) {
       result.className = 'fog-result success';
       result.textContent = '✓ 正确！';
       setTimeout(function() { close(true); }, 400);
@@ -781,15 +786,15 @@ function checkAnswer() {
   var q = vocab[currentIndex];
   if (feverMode) {
     var userAnswer = document.getElementById('feverInput').value.trim().replace(/\s+/g, ' ');
-    if (userAnswer.toLowerCase() === q.en.toLowerCase()) {
+    if (normalize(userAnswer) === normalize(q.en)) {
       handleCorrect();
     } else {
       handleWrong(q.en);
     }
   } else {
     if (selectedWords.length === 0) { isProcessing = false; return; }
-    var userSorted = selectedWords.map(function(w) { return w.toLowerCase(); }).sort().join(' ');
-    var ansSorted  = q.en.toLowerCase().split(' ').sort().join(' ');
+    var userSorted = selectedWords.map(function(w) { return normalize(w); }).sort().join(' ');
+    var ansSorted  = normalize(q.en).split(' ').sort().join(' ');
     if (userSorted === ansSorted) {
       handleCorrect();
     } else {

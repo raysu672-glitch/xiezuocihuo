@@ -794,7 +794,7 @@ function checkAnswer() {
   } else {
     if (selectedWords.length === 0) { isProcessing = false; return; }
     var userSorted = selectedWords.map(function(w) { return normalize(w); }).sort().join(' ');
-    var ansSorted  = normalize(q.en).split(' ').sort().join(' ');
+    var ansSorted  = q.en.split(' ').map(function(w) { return normalize(w); }).sort().join(' ');
     if (userSorted === ansSorted) {
       handleCorrect();
     } else {
